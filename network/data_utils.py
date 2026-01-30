@@ -7,29 +7,6 @@ from imgaug import augmenters as iaa
 from shapely.geometry import Polygon, LineString
 
 
-# def has_self_intersection(contour_batch):
-#     """
-#     contour_batch: (num_contour, num_vertex, 2)
-#     Returns:
-#         List of bools [True/False] for each contour
-#     """
-#     if isinstance(contour_batch, torch.Tensor):
-#         contour_batch = contour_batch.detach().cpu().numpy()
-#
-#     contour_batch = np.squeeze(contour_batch)
-#     if len(contour_batch.shape) != 3 or contour_batch.shape[2] != 2:
-#         raise ValueError(f"Expected (N, V, 2) shape, got {contour_batch.shape}")
-#
-#     results = []
-#     for contour in contour_batch:
-#         if len(contour) < 3:
-#             results.append(False)
-#             continue
-#         closed = np.vstack([contour, contour[0]])  # close loop
-#         poly = LineString(closed)
-#         results.append(not poly.is_simple)
-#
-#     return results  # list of bool
 def has_self_intersection(contour):
     """
     contour: (V, 2) torch.Tensor or np.ndarray

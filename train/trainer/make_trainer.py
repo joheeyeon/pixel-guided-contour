@@ -1,37 +1,16 @@
-import importlib
 import os
-# from .polylstm import NetworkWrapper
 from .trainer import Trainer
 import torch
 
 
 def _wrapper_factory(network, cfg):
-    # NetworkWrapper = importlib.import_module(f".{cfg.train.trainer}.NetworkWrapper", package=__name__)
-    if cfg.commen.task.split('+')[0] == 'init':
-        from .init import NetworkWrapper
-    elif cfg.commen.task.split('+')[0] == 'coarse':
-        from .coarse import NetworkWrapper
-    elif cfg.commen.task.split('+')[0] == 'e2ec':
-        from .e2ec import NetworkWrapper
-    elif cfg.commen.task.split('+')[0] == 'ccp':
+    if cfg.commen.task.split('+')[0] == 'ccp':
         from .ccp import NetworkWrapper
-    elif cfg.commen.task.split('+')[0] == 'ccp_pyramid':
-        from .ccp_pyramid import NetworkWrapper
-    elif cfg.commen.task.split('+')[0] == 'ccp_maskinit':
-        from .ccp_maskinit import NetworkWrapper
-    elif cfg.commen.task.split('+')[0] == 'snake_init':
-        from .snake_init import NetworkWrapper
-    elif cfg.commen.task.split('+')[0] == 'snake_coarse':
-        from .snake_coarse import NetworkWrapper
-    elif cfg.commen.task.split('+')[0] == 'deepsnake':
-        from .deepsnake import NetworkWrapper
-    elif cfg.commen.task.split('+')[0] == 'pixel':
-        from .pixel import NetworkWrapper
     else:
-        from .rnn import NetworkWrapper
+        raise ValueError(f"Unsupported task: {cfg.commen.task}")
+    
     wrapper = NetworkWrapper(network, with_dml=cfg.train.with_dml,
                           ml_start_epoch=cfg.train.ml_start_epoch, weight_dict=cfg.train.weight_dict, cfg=cfg)
-    # ccp 및 ccp_maskinit task에 대해 stage 시스템 적용
     if cfg.commen.task.split('+')[0] in ['ccp', 'ccp_maskinit']:
         if hasattr(cfg.train, 'stage') and cfg.train.stage in [1, 2]:
             apply_stage(cfg, network, wrapper)
@@ -145,8 +124,6 @@ def apply_stage(cfg, net, net_wrapper):
             if not stage1_loaded:
                 print("[STAGE 2] No Stage 1 model found - training from scratch")
             
-            # freeze_s1_modules 옵션에 따라 학습 모드 결정
-            # 단, Stage 1 모델이 로드되지 않은 경우 freeze_s1_modules 무시
             freeze_s1 = getattr(cfg.train, 'freeze_s1_modules', False) and stage1_loaded
             task_name = cfg.commen.task.split('+')[0]
             
@@ -155,8 +132,7 @@ def apply_stage(cfg, net, net_wrapper):
                 print(f"[STAGE 2] {task_name}: Training all modules (no Stage 1 model)")
                 unfreeze_all(net)
             elif freeze_s1:
-                # Stage 1에서 학습된 모듈들은 freeze, 나머지만 학습
-                # Stage 1에서 ct_hm, wh head가 학습되었다면 해당 head들도 freeze
+
                 stage1_trained_ct_hm = getattr(cfg.train, 'stage1_train_ct_hm', False)
                 stage1_trained_wh = getattr(cfg.train, 'stage1_train_wh', False)
                 
@@ -171,15 +147,11 @@ def apply_stage(cfg, net, net_wrapper):
                 # 1) 전체 모델 freeze
                 freeze_all(net)
                 
-                # 2) stage 2에서 학습할 모듈들만 unfreeze
-                # - ct_hm head는 Stage 1에서 학습되지 않았을 때만 unfreeze
-                # - wh head는 Stage 1에서 학습되지 않았을 때만 unfreeze
-                # - pixel refine 모듈
-                # - evolve/snake 관련 모듈
+
                 
                 unfrozen_modules = []
                 
-                # Head 모듈들과 refine 모듈들 unfreeze
+
                 unfrozen_param_count = 0
                 for name, param in net.named_parameters():
                     # ct_hm head: Stage 1에서 학습되지 않았을 때만 unfreeze
@@ -241,10 +213,8 @@ def apply_stage(cfg, net, net_wrapper):
                             if trained_in_s1:
                                 print(f"      -> {head_name.upper()} was trained in Stage 1, now frozen")
                 
-                # BatchNorm eval 설정
                 set_bn_eval_if_frozen(net)
                 
-                # 실제로 unfreeze된 모듈들 출력
                 for module_name in unfrozen_modules:
                     print(f"  └ {module_name}: unfrozen")
                         

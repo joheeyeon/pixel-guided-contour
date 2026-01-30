@@ -1,11 +1,6 @@
 from configs.base import commen, data, model, train, test
 import numpy as np
 
-'''
-1. gcn weight sharing : no
-2. pixel refine : no
-'''
-
 commen.task = 'ccp'
 
 # commen.init_points_per_poly = 64
@@ -16,9 +11,6 @@ commen.task = 'ccp'
 
 data.valid_box_margin = 0
 data.valid_box_area = 0
-# data.scale_range = [1.0, 1.0]
-# data.val_split = 'mini'
-# data.scale = None
 scale = np.array([1024, 1024])
 data.augment_shift = True
 data.test_scale = (512, 512)
@@ -53,8 +45,6 @@ train.loss_type.update({'cv': 'l1', 'tv': 'l1', 'pixel': 'focal'})
 train.loss_params['pixel'].update({'gamma': 2})
 train.is_normalize_pixel = False
 
-# about mdl
-# train.ml_range_py = 'except_1st'
 train.with_dml = True
 train.ml_start_epoch = 5
 
@@ -63,7 +53,6 @@ train.use_dp = False
 test.dataset = 'whu_val'
 test.with_nms = False
 
-# down ratio
 commen.down_ratio = 1
 train.down_ratio = 1
 model.down_ratio = 4

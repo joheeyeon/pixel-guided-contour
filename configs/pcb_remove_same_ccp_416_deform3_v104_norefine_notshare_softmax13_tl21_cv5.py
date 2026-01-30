@@ -1,17 +1,11 @@
 from configs.base import commen, data, model, train, test
 import numpy as np
 
-'''
-1. gcn weight sharing : no
-2. pixel refine : no
-'''
-
 commen.task = 'ccp'
 
 data.valid_box_margin = 0
 data.valid_box_area = 0
 data.scale_range = [1.0, 1.0]
-# data.val_split = 'mini'
 data.scale = None
 data.augment_shift = False
 data.test_scale = (416, 416)
@@ -20,7 +14,7 @@ data.add_augment_curved = False
 data.douglas.update({'D': 0.01})
 data.gt_mask_label = {255: 1}
 
-model.ccp_deform_pixel_norm = 'softmax' #('softmax','argmax')
+model.ccp_deform_pixel_norm = 'softmax'
 model.use_refine_pixel = False
 model.refine_pixel_param.update({'module_structure': {'conv_1': [256, 256]}})
 model.ccp_refine_pixel_as_residual =False
@@ -49,7 +43,6 @@ train.loss_type.update({'tv': 'l1', 'pixel': 'focal', 'cv': 'l1'})
 train.loss_params['pixel'].update({'gamma': 2})
 train.is_normalize_pixel = False
 
-# about mdl
 train.ml_range_py = 'except_1st'
 train.with_dml = True
 train.ml_start_epoch = 5

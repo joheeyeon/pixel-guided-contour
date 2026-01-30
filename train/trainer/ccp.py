@@ -173,13 +173,7 @@ class NetworkWrapper(nn.Module):
         else:
             output = self.net(batch['inp'], batch=batch)
             return self.compute_loss(output, batch, output_t=output_t, mode=mode)
-            # for k, v in output.items():
-            #     if isinstance(v, torch.Tensor):
-            #         print(f"[rank{dist.get_rank()}] {k}: shape={v.shape}, dtype={v.dtype}, requires_grad={v.requires_grad}")
-            #     else:
-            #         for elem in v:
-            #             print(
-            #                 f"[rank{dist.get_rank()}] {k}: shape={elem.shape}, dtype={elem.dtype}, requires_grad={elem.requires_grad}")
+
     def compute_loss(self, output, batch, output_t=None, mode='default'):
         out_ontraining = {}
         epoch = batch['epoch']
@@ -371,8 +365,6 @@ class NetworkWrapper(nn.Module):
             scalar_stats.update({'coarse_py_loss': coarse_py_loss})
             loss += coarse_py_loss * weight_py
 
-        # for snake (evolve)
-        # print(f"[rank {torch.distributed.get_rank()}] 🚀 Starting py_loss computation")
         if self.ml_range_py:
             special_loss_range = self.ml_range_py
             special_loss_start_epoch = self.ml_start_epoch
@@ -585,7 +577,6 @@ class NetworkWrapper(nn.Module):
                 loss += region_loss * weight_region_crit
 
         if self.cfg.model.with_sharp_contour:
-            # for IPC
             if epoch >= self.cfg.train.sharp_param['ipc_start_epoch']:
                 if 'ipc' in output:
                     n_iter_ipc = len(output['ipc'])
@@ -605,7 +596,6 @@ class NetworkWrapper(nn.Module):
                     scalar_stats.update({f'ipc_random_loss(M={n_iter_ipc})': ipc_loss_random})
                     loss += ipc_loss_random * self.weight_dict['ipc']
 
-            # for sharp refine
             if self.cfg.train.sharp_param['train_with_refine'] and epoch >= self.cfg.train.sharp_param['refine_start_epoch']:
                 if self.cfg.train.sharp_param['refine_with_dml'] and epoch >= self.start_epoch:
                     num_sharp_iter = len(output['py_pred']) - self.cfg.model.evolve_iters
@@ -764,14 +754,6 @@ class NetworkWrapper(nn.Module):
 
     @torch.no_grad()
     def _create_targets(self, instances, img_hw, lid=0):
-        # if self.predict_in_box_space:
-        #     if self.clip_to_proposal or not self.use_rasterized_gt:  # in coco, this is true
-        #         clip_boxes = torch.cat([inst.proposal_boxes.tensor for inst in instances])
-        #         masks = self.clipper(instances, clip_boxes=clip_boxes, lid=lid)  # bitmask
-        #     else:
-        #         masks = rasterize_instances(self.gt_rasterizer, instances, self.rasterize_at)
-        # else:
-        #     masks = self.get_bitmasks(instances, img_h=img_wh[1], img_w=img_wh[0])
         masks = []
         for obj_i in range(instances.shape[0]):
             instance = instances[obj_i].astype(np.int32)

@@ -67,7 +67,7 @@ class model(object):
     refine_pixel_param = {}
     use_refine_pixel = True
     cat_feature_normalized = False
-    cat_include_coarse = False # 이전에는 True 였음 (rev 25-09-04)
+    cat_include_coarse = False
     cut_grad_add_feature = False
     cat_feature_with_pixelmap = False
     dla_clone_to_ida_up = True
@@ -125,12 +125,11 @@ class model(object):
     load_vgg = True
     dla_layer = 34
     head_conv = 256
-    # head_conv 구조 세부 설정 (kernel size, layer 수, filter 갯수 모두 설정 가능)
     head_conv_config = {
-        'kernel_sizes': [3, 1],     # 각 layer의 kernel size 리스트 [intermediate, final]
-        'channels': None,           # None이면 기본 [head_conv, classes] 사용
-        'use_relu': [True],         # 각 layer 후 ReLU 사용 여부 (마지막 layer는 자동으로 False)
-        'padding': 'auto'           # 'auto'면 (kernel_size-1)//2로 자동 계산
+        'kernel_sizes': [3, 1],
+        'channels': None,
+        'use_relu': [True],
+        'padding': 'auto'
     }
     use_dcn = True
     points_per_poly = commen.points_per_poly
@@ -138,14 +137,14 @@ class model(object):
     init_stride = 10.
     coarse_stride = 4.
     evolve_stride = 1.
-    evolve_iter_num = 1  # GCN iteration 횟수
-    gcn_weight_sharing = True  # True: weight sharing, False: non-sharing
-    use_pixel_on_init = False  # True: pixel head 먼저 수행 후 concat, False: 표준 동시 생성
-    pixel_concat_with_activation = False  # True: pixel output에 softmax 적용 후 concat, False: raw output concat
-    use_3x3_feature = False  # True: use 3x3 patch features around vertices, False: use 1x1 features
-    feature_3x3_mode = 'flatten'  # 'flatten': flatten 3x3 to C*9 channels, 'conv2d': use 2D circular convolution
-    feature_3x3_detach = True  # True: detach 3x3 features (no gradient) - safer for AsStridedBackward0 issues, False: keep gradient
-    concat_multi_layers = None  # 새로운 multi-scale concat 옵션: ['base_2', 'base_3'] 등 - 여러 레이어 동시 concat
+    evolve_iter_num = 1
+    gcn_weight_sharing = True
+    use_pixel_on_init = False
+    pixel_concat_with_activation = False
+    use_3x3_feature = False
+    feature_3x3_mode = 'flatten'
+    feature_3x3_detach = True
+    concat_multi_layers = None
     backbone_num_layers = 34
     heads = {'ct_hm': 20, 'wh': commen.init_points_per_poly * 2}
     # heads = {'ct_hm': 20, 'wh': commen.points_per_poly * 2}
@@ -202,7 +201,7 @@ class train(object):
     val_metric = 'ap'
     best_metric_crit = 'max'
     earlystop = 150
-    min_epochs_for_earlystop = 0  # early stopping이 활성화되기 전 최소 에포크 수
+    min_epochs_for_earlystop = 0
     is_save_model_all = False
     save_ep = 5
     # eval_ep = 5
@@ -212,13 +211,12 @@ class train(object):
                  'milestones': [80, 120, ],
                  'gamma': 0.5}
     
-    # Temperature parameter scheduling 옵션 (trainable_softmax, trainable_softmax_softclamp 사용 시)
     temperature_advanced_scheduling = {
-        'enabled': False,                    # 고급 스케줄링 사용 여부 (기본: False)
-        'freeze_epochs': 1,                  # 초반 freeze할 epoch 수 (기본: 1)
-        'warmup_ratio': 0.03,                # warmup 비율 (전체 epoch 대비, 기본: 3%)
-        'final_scheduler': 'cosine',         # warmup 후 사용할 스케줄러 ('cosine' or 'multistep')
-        'cosine_eta_min_ratio': 1e-3,       # cosine의 경우 eta_min = initial_lr * cosine_eta_min_ratio
+        'enabled': False,
+        'freeze_epochs': 1,
+        'warmup_ratio': 0.03,
+        'final_scheduler': 'cosine',
+        'cosine_eta_min_ratio': 1e-3,
     }
     
     batch_size = 24
@@ -229,46 +227,19 @@ class train(object):
     mdml_start_epoch = 0
     weight_dict = {'box_ct': 1, 'init': 0.1, 'coarse': 0.1, 'evolve': 1., 'tv': 0., 'cv': 0.}
     dataset = 'sbd_train'
-    # ccp 및 ccp_maskinit stage 1에서 ct_hm head도 함께 학습할지 여부 (기본값: False - pixel head만 학습)
     stage1_train_ct_hm = False
-    # ccp stage 1에서 wh head도 함께 학습할지 여부 (기본값: False - pixel head만 학습)
     stage1_train_wh = False
-    # ccp 및 ccp_maskinit stage 2에서 stage 1 모듈을 freeze할지 여부 (기본값: False - 모든 모듈 학습)
     freeze_s1_modules = False
-    # ccp_maskinit GT-Prediction 매칭 시 최대 center distance (피처맵 좌표계 기준, 기본값: 50픽셀)
     max_center_distance_maskinit = 50.0
-    # Stage 2 학습 시 Stage 1 모델 selective loading 사용 여부 (기본값: True)
-    # True: 전체 모델 로드 실패 시 Stage 1 모듈만 선택적 로드, False: 전체 모델 로드만 시도
     use_selective_s1_loading = True
 
 class test(object):
-    with_vertex_reordering = False
     check_val_every_n_epoch = 1
-    track_self_intersection = False  # 기본 꺼두고 필요할 때 켬 (edit:feat:self-intersection-count:25-08-10)
-    track_include_reduced = True  # py_reduced까지 포함할지 (edit:feat:self-intersection-count:25-08-10)
-    viz_mode = "final"
-    visualize = False
-    # ccp_maskinit pixel map initial contour 시각화 옵션
-    save_pixel_initial_contours = False  # pixel map에서 추출한 ct_score 필터링 전 initial contour 저장
-    viz_pixel_initial_contours = False   # test 시 pixel initial contour 시각화
-    viz_stage1_init = False              # Stage 1에서 poly_init 시각화 (ct_hm 또는 wh head 학습 시)
-    single_rotate_angle = None
-    use_rotate_tta = False
-    reduce_step = 0.05
-    reduce_min_vertices = 3
-    reduce_apply_adaptive_th = False
-    th_score_vertex_cls = 0.6
-    use_vertex_reduction = True
-    check_simple = False
-    get_featuremap = False
     down_ratio = data.down_ratio
     task = commen.task
     vis_th_score = 0.3
-    calc_deform_metric = False
-    extract_offset = False
-    vis_iou = False
     batch_size = 1
-    test_stage = 'final'  # init, coarse final
+    test_stage = 'final'
     test_rescale = None
     ct_score = 0.05
     with_nms = True

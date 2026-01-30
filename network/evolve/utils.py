@@ -1,5 +1,4 @@
 import torch
-from network.detector_decode.snake_decode import get_octagon, get_init
 from network.detector_decode.utils import uniform_upsample
 from network import data_utils
 import numpy as np
@@ -211,25 +210,6 @@ def get_box_match_ind(pred_box, score, gt_poly, th_iou=0.7, th_confidence=0.1):
 
     return box_ind, gt_ind
 
-def prepare_training_snake_evolve(ex, init, poly_num=128, train_pred_ex=True, train_nearest_gt=True):
-    from network.extreme_utils_replacement import roll_array
-    if not train_pred_ex:
-        evolve = {'img_it_polys': init['img_it_polys'], 'can_it_polys': init['can_it_polys'], 'img_gt_polys': init['img_gt_polys']}
-        return evolve
-
-    img_gt_polys = init['img_gt_polys']
-
-    if train_nearest_gt:
-        shift = -(ex[:, :1] - img_gt_polys).pow(2).sum(2).argmin(1)
-        img_gt_polys = roll_array(img_gt_polys, shift)
-
-    img_it_polys = get_octagon(ex[None])
-    img_it_polys = uniform_upsample(img_it_polys, poly_num)[0]
-    can_it_polys = img_poly_to_can_poly(img_it_polys)
-    evolve = {'img_it_polys': img_it_polys, 'can_it_polys': can_it_polys, 'img_gt_polys': img_gt_polys}
-
-    return evolve
-
 def prepare_training_init(ret, batch, ro, num_points=128, with_img_idx=False):
     # ct_01 = batch['ct_01'].byte()
     ct_01 = batch['ct_01'].bool()
@@ -245,75 +225,6 @@ def prepare_training_init(ret, batch, ro, num_points=128, with_img_idx=False):
     init['py_ind'] = init['py_ind'].to(ct_01.device)
 
     return init
-
-def prepare_training_snake(ret, batch, train_pred_box=True):
-    # ct_01 = batch['ct_01'].byte()
-    ct_01 = batch['ct_01'].bool()
-    init = {}
-    init.update({'img_it_init_polys': collect_training(batch['img_it_init_polys'], ct_01)})
-    init.update({'can_it_init_polys': collect_training(batch['can_it_init_polys'], ct_01)})
-    init.update({'img_gt_init_polys': collect_training(batch['img_gt_init_polys'], ct_01)})
-    init.update({'can_gt_init_polys': collect_training(batch['can_gt_init_polys'], ct_01)})
-
-    init.update({'img_it_polys': collect_training(batch['img_it_polys'], ct_01)})
-    init.update({'can_it_polys': collect_training(batch['can_it_polys'], ct_01)})
-    init.update({'img_gt_polys': collect_training(batch['img_gt_polys'], ct_01)})
-    init.update({'can_gt_polys': collect_training(batch['can_gt_polys'], ct_01)})
-
-    ct_num = batch['meta']['ct_num']
-    init.update({'4py_ind': torch.cat([torch.full([ct_num[i]], i) for i in range(ct_01.size(0))], dim=0)})
-    init.update({'py_ind': init['4py_ind']})
-
-    if train_pred_box:
-        prepare_training_box(ret, batch, init)
-
-    init['4py_ind'] = init['4py_ind'].to(ct_01.device)
-    init['py_ind'] = init['py_ind'].to(ct_01.device)
-
-    return init
-
-def prepare_training_box(ret, batch, init, init_poly_num=40, poly_num=128, train_pred_box_only=True):
-    box = ret['detection'][..., :4] #(batch, K, 4)
-    score = ret['detection'][..., 4]
-    batch_size = box.size(0)
-    img_gt_init_polys = batch['img_gt_init_polys']
-    # ct_01 = batch['ct_01'].byte()
-    ct_01 = batch['ct_01'].bool()
-    ind = [get_box_match_ind(box[i], score[i], img_gt_init_polys[i][ct_01[i]]) for i in range(batch_size)]#output of `get_box_match_ind` : box_ind, gt_ind
-    box_ind = [ind_[0] for ind_ in ind]
-    gt_ind = [ind_[1] for ind_ in ind]
-
-    img_it_init_polys = torch.cat([get_init(box[i][box_ind[i]][None]) for i in range(batch_size)], dim=1) # batch * (1, n_ind,4,2) -> (1, n_ind_all, 4, 2)
-    if img_it_init_polys.size(1) == 0:
-        return
-
-    img_it_init_polys = uniform_upsample(img_it_init_polys, init_poly_num)[0]
-    can_it_init_polys = img_poly_to_can_poly(img_it_init_polys)
-    img_gt_init_polys = torch.cat([batch['img_gt_init_polys'][i][gt_ind[i]] for i in range(batch_size)], dim=0)
-    can_gt_init_polys = torch.cat([batch['can_gt_init_polys'][i][gt_ind[i]] for i in range(batch_size)], dim=0)
-    init_4py = {'img_it_init_polys': img_it_init_polys, 'can_it_init_polys': can_it_init_polys, 'img_gt_init_polys': img_gt_init_polys, 'can_gt_init_polys': can_gt_init_polys}
-
-    i_it_py = get_octagon(img_it_init_polys[None])
-    i_it_py = uniform_upsample(i_it_py, poly_num)[0]
-    c_it_py = img_poly_to_can_poly(i_it_py)
-    i_gt_py = torch.cat([batch['img_gt_polys'][i][gt_ind[i]] for i in range(batch_size)], dim=0)
-    init_py = {'img_it_polys': i_it_py, 'can_it_polys': c_it_py, 'img_gt_polys': i_gt_py}
-
-    ind = torch.cat([torch.full([len(gt_ind[i])], i) for i in range(batch_size)], dim=0)
-
-    if train_pred_box_only: # train using predicted box only
-        for k, v in init_4py.items():
-            init[k] = v
-        for k, v in init_py.items():
-            init[k] = v
-        init['4py_ind'] = ind
-        init['py_ind'] = ind
-    else: # train using predicted box & gt box
-        init.update({k: torch.cat([init[k], v], dim=0) for k, v in init_4py.items()})
-        init.update({'4py_ind': torch.cat([init['4py_ind'], ind], dim=0)})
-        init.update({k: torch.cat([init[k], v], dim=0) for k, v in init_py.items()})
-        init.update({'py_ind': torch.cat([init['py_ind'], ind], dim=0)})
-
 
 def prepare_training(ret, batch, ro=4., num_points=128, with_img_idx=False, init_key='poly_coarse', set_py=True):
     # ct_01 = batch['ct_01'].byte()
@@ -594,29 +505,6 @@ def prepare_testing_init(polys, ro, num_points=128, py_ind=None, set_py=True):
         init['py_ind'] = py_ind
     return init
 
-def prepare_testing_snake_evolve(ex, poly_num=128):
-    if len(ex) == 0:
-        i_it_pys = torch.zeros([0, poly_num, 2]).to(ex)
-        c_it_pys = torch.zeros_like(i_it_pys)
-    else:
-        i_it_pys = get_octagon(ex[None])
-        i_it_pys = uniform_upsample(i_it_pys, poly_num)[0]
-        c_it_pys = img_poly_to_can_poly(i_it_pys)
-    evolve = {'img_it_polys': i_it_pys, 'can_it_polys': c_it_pys}
-    return evolve
-
-def prepare_testing_snake_init(box, score, th_ct_score, init_poly_num=40):
-    img_it_init_polys = get_init(box)
-    img_it_init_polys = uniform_upsample(img_it_init_polys, init_poly_num)
-    can_it_init_polys = img_poly_to_can_poly(img_it_init_polys)
-
-    ind = score > th_ct_score
-    img_it_init_polys = img_it_init_polys[ind]
-    can_it_init_polys = can_it_init_polys[ind]
-    ind = torch.cat([torch.full([ind[i].sum()], i) for i in range(ind.size(0))], dim=0)
-    init = {'img_it_init_polys': img_it_init_polys, 'can_it_init_polys': can_it_init_polys, 'ind': ind}
-
-    return init
 
 # def uniform_upsample(poly, p_num):
 #     from network.detector_decode.extreme_utils import _ext as extreme_utils

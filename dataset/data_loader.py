@@ -1,5 +1,4 @@
 import torch
-import torch.utils.data
 from .collate_batch import collate_batch
 from .info import DatasetInfo
 import numpy as np
@@ -35,16 +34,10 @@ def make_dataset(dataset_name, is_test, cfg, split=None):
 
 
 def make_data_sampler(dataset, shuffle, drop_last=False):
-    # ✅ DDP 활성화 상태라면 DistributedSampler 사용
     if torch.distributed.is_available() and torch.distributed.is_initialized():
         return make_ddp_data_sampler(dataset, shuffle, drop_last)
     else:
         return torch.utils.data.RandomSampler(dataset) if shuffle else torch.utils.data.SequentialSampler(dataset)
-    # if shuffle:
-    #     sampler = torch.utils.data.sampler.RandomSampler(dataset)
-    # else:
-    #     sampler = torch.utils.data.sampler.SequentialSampler(dataset)
-    # return sampler
 
 def make_ddp_data_sampler(dataset, shuffle, drop_last=False):
     sampler = torch.utils.data.distributed.DistributedSampler(dataset,
@@ -69,14 +62,10 @@ def make_train_loader(cfg, split=None):
     else:
         dataset = make_dataset(dataset_name, is_test=False, cfg=cfg, split=split)
 
-    # dataset = make_dataset(dataset_name, is_test=False, cfg=cfg)
-
-    # 🔥 분기: DDP면 shuffle=False 강제, 아니면 True
     use_ddp = torch.distributed.is_available() and torch.distributed.is_initialized()
     shuffle_flag = (not use_ddp)
 
     sampler = make_data_sampler(dataset, shuffle=shuffle_flag, drop_last=drop_last)
-    # batch_sampler = make_batch_data_sampler(sampler, batch_size, drop_last)
     num_workers = cfg.train.num_workers
     collator = collate_batch
     data_loader = torch.utils.data.DataLoader(

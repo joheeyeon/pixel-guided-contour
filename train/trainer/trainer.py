@@ -36,11 +36,6 @@ class Trainer(object):
             print("Network is wrapped with DataParallel")
         else:
             print("Network is a single model")
-        # if not isinstance(network, torch.nn.DataParallel):
-        #     network = network.cuda()
-        #     if network_t is not None:
-        #         network_t = network_t.cuda()
-        #     print("to cuda (re)")
         print(f"isinstance(network, torch.nn.DataParallel) : {isinstance(network, torch.nn.DataParallel)}")
         self.network = network
         self.network_t = network_t
@@ -80,14 +75,10 @@ class Trainer(object):
             for name, param in model.named_parameters():
                 param.data.copy_(self.params_backup[name])
 
-    # 학습률 조정 함수
     def adjust_learning_rate(self, optimizer, new_lr):
         for param_group in optimizer.param_groups:
             param_group['lr'] = new_lr
 
-    # def reduce_loss_stats(self, loss_stats):
-    #     reduced_losses = {k: torch.mean(v) for k, v in loss_stats.items()}
-    #     return reduced_losses
     def reduce_loss_stats(self, loss_stats):
         reduced_losses = {}
 
@@ -354,13 +345,6 @@ class Trainer(object):
                         pixel_gt = torch.nn.functional.interpolate(batch['pixel_gt'].unsqueeze(1).float(),
                                                  size=(output['pixel'].size(-2), output['pixel'].size(-1)), mode='nearest').squeeze(1)
                         self.pixel_evaluator.stack_results(pixel_gt, output['pixel'])
-                        # pixel_acc, dice, precision, recall = self.pixel_evaluator(pixel_gt, output['pixel'])
-                        # if self.cfg.train.val_metric == 'acc':
-                        #     val_metric_sum += pixel_acc
-                        # elif self.cfg.train.val_metric == 'dice':
-                        #     val_metric_sum += dice
-                        # elif self.cfg.train.val_metric == 'f1':
-                        #     val_metric_sum += 2 * (precision * recall) / (precision + recall)
                 else:
                     output = self.network(batch)
                     if self.cfg.train.validate_with_reduction:

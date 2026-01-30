@@ -467,39 +467,6 @@ class TemperatureFocalCELoss(nn.Module):
         else:
             return F_loss
 
-# class FocalBCELoss(nn.Module):
-#     def __init__(self, gamma=2, reduce=True):
-#         super(FocalBCELoss, self).__init__()
-#         self.gamma = gamma
-#         self.reduce = reduce
-
-#     def forward(self, inputs, targets):
-#         # inputs: [B, 2, H, W] - 2 channels for binary classification
-#         # targets: [B, H, W] - binary targets (0 or 1)
-        
-#         # Convert targets to one-hot format [B, 2, H, W]
-#         targets_one_hot = torch.zeros_like(inputs)
-#         targets_one_hot.scatter_(1, targets.unsqueeze(1).long(), 1)
-        
-#         # Apply sigmoid to get probabilities
-#         probs = torch.sigmoid(inputs)
-        
-#         # Calculate BCE loss for each channel
-#         bce_loss = -(targets_one_hot * torch.log(probs + 1e-8) + 
-#                     (1 - targets_one_hot) * torch.log(1 - probs + 1e-8))
-        
-#         # Calculate focal weight
-#         pt = torch.where(targets_one_hot == 1, probs, 1 - probs)
-#         focal_weight = (1 - pt) ** self.gamma
-        
-#         # Apply focal weight
-#         focal_loss = focal_weight * bce_loss
-        
-#         if self.reduce:
-#             return torch.mean(focal_loss)
-#         else:
-#             return focal_loss
-
 class FocalBCELoss(nn.Module):
     def __init__(self, gamma=2.0, alpha_fg=0.5, alpha_bg=0.25, reduction="mean"):
         super().__init__()

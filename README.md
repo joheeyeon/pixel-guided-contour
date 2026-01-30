@@ -46,13 +46,13 @@ pip install -r requirements.txt
 ## Training
 
 ```bash
-python train_net_lit.py --config configs/pcb.yaml
+python train_net_lit.py pcb_remove_same_ccp_416_deform3_v104_norefine_notshare_softmax13_tl21_cv5 --exp exp0 --epochs 100
 ```
 
 ## Evaluation
 
 ```bash
-python test_lit.py --config configs/pcb.yaml
+python test_lit.py pcb_remove_same_ccp_416_deform3_v104_norefine_notshare_softmax13_tl21_cv5 --checkpoint /path/to/checkpoint.pth --viz
 ```
 
 ## License
