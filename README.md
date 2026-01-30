@@ -20,118 +20,24 @@ In addition, geometric regularization terms are introduced to suppress self-inte
 ```text
 pixel-guided-contour/
  ├─ boundary-iou-api/          # Boundary IoU evaluation utilities
- │   ├─ setup.py
- │   ├─ README.md
- │   ├─ license.txt
- │   └─ init.txt
  ├─ configs/                   # Configuration files
- │   ├─ base.py
- │   ├─ pcb_remove_same_ccp_416_deform3_v104_norefine_notshare_softmax13_tl21_cv5.py
- │   └─ whu_ccp_512_softmax2_tl16_cv4.py
- ├─ data/                      # Dataset resources
- │   ├─ README.md
- │   ├─ pcb/
- │   └─ whu/
+ ├─ data/                      # Dataset resources (PCB, WHU)
  ├─ dataset/                   # Dataset loading and preprocessing
- │   ├─ __init__.py
- │   ├─ collate_batch.py
- │   ├─ data_loader.py
- │   ├─ demo_dataset.py
- │   ├─ info.py
  │   ├─ test/                  # Test dataset classes
- │   │   ├─ base.py
- │   │   ├─ cityscapes.py
- │   │   ├─ cityscapesCoco.py
- │   │   ├─ coco.py
- │   │   ├─ kitti.py
- │   │   ├─ pcb.py
- │   │   ├─ sbd.py
- │   │   └─ whu.py
  │   └─ train/                 # Training dataset classes
- │       ├─ __init__.py
- │       ├─ base.py
- │       ├─ cityscapes.py
- │       ├─ cityscapesCoco.py
- │       ├─ coco.py
- │       ├─ douglas.py
- │       ├─ kitti.py
- │       ├─ pcb.py
- │       ├─ sbd.py
- │       ├─ utils.py
- │       └─ whu.py
  ├─ evaluator/                 # Evaluation metrics
- │   ├─ __init__.py
- │   ├─ make_evaluator.py
  │   ├─ pcb/                   # PCB dataset evaluation
- │   │   ├─ boundary.py
- │   │   ├─ cocoeval.py
- │   │   ├─ rasterize.py
- │   │   ├─ snake.py
- │   │   └─ utils.py
  │   └─ whu/                   # WHU dataset evaluation
- │       ├─ boundary.py
- │       ├─ cocoeval.py
- │       ├─ rasterize.py
- │       ├─ snake.py
- │       └─ utils.py
  ├─ network/                   # Model architectures
- │   ├─ __init__.py
- │   ├─ make_network.py
- │   ├─ data_utils.py
- │   ├─ extreme_utils_replacement.py
- │   ├─ backbone/              # Backbone networks
- │   │   ├─ dcn_v2.py
- │   │   ├─ dla.py
- │   │   └─ resnet.py
+ │   ├─ backbone/              # Backbone networks (DLA, ResNet)
  │   ├─ detector_decode/       # Detection decoding heads
- │   │   ├─ refine_decode.py
- │   │   ├─ snake_decode.py
- │   │   ├─ utils.py
- │   │   └─ extreme_utils/     # CUDA utilities
- │   │       ├─ setup.py
- │   │       ├─ utils.cpp
- │   │       ├─ utils.h
- │   │       └─ src/
- │   │           ├─ cuda_common.h
- │   │           ├─ nms.cu
- │   │           ├─ nms.h
- │   │           └─ utils.cu
  │   └─ evolve/                # Contour evolution modules
- │       ├─ __init__.py
- │       ├─ evolve.py
- │       ├─ evolve_ccp.py
- │       ├─ evolve_rnn.py
- │       ├─ convlstm.py
- │       ├─ snake.py
- │       ├─ snake_evolve.py
- │       ├─ sharp.py
- │       └─ utils.py
  ├─ train/                     # Training modules
- │   ├─ __init__.py
- │   ├─ model_utils/
- │   │   └─ utils.py
- │   ├─ optimizer/
- │   │   └─ optimizer.py
- │   ├─ recorder/
- │   │   └─ recorder.py
- │   ├─ scheduler/
- │   │   └─ scheduler.py
+ │   ├─ model_utils/           # Model utilities
+ │   ├─ optimizer/             # Optimizer configuration
+ │   ├─ recorder/              # Training recorder
+ │   ├─ scheduler/             # Learning rate scheduler
  │   └─ trainer/               # Training logic for different methods
- │       ├─ make_trainer.py
- │       ├─ trainer.py
- │       ├─ ccp.py
- │       ├─ ccp_pyramid.py
- │       ├─ ccp_maskinit.py
- │       ├─ pixel.py
- │       ├─ coarse.py
- │       ├─ e2ec.py
- │       ├─ init.py
- │       ├─ rasterize.py
- │       ├─ deepsnake.py
- │       ├─ rnn.py
- │       ├─ snake_coarse.py
- │       ├─ snake_init.py
- │       └─ utils.py
  ├─ train_net_lit.py          # Training script
  ├─ test_lit.py               # Testing script
  ├─ requirements.txt
