@@ -10,32 +10,32 @@ _scheduler_factory = {
 
 class AdvancedTemperatureScheduler(_LRScheduler):
     """
-    Temperature parameter를 위한 고급 스케줄링: freeze → warmup → cosine/multistep
+    Advanced scheduling for temperature parameter: freeze → warmup → cosine/multistep
     """
     def __init__(self, optimizer, config, last_epoch=-1, verbose=False):
-        # Config에서 필요한 값들만 추출하여 저장 (pickle 문제 방지)
+        # Extract and save only necessary values from config (prevent pickle issues)
         self.total_epochs = config.train.epoch
         self.temp_config = config.train.temperature_advanced_scheduling.copy()
         
-        # 기본 optimizer 설정도 저장
+        # Save basic optimizer configuration
         self.default_milestones = config.train.optimizer['milestones']
         self.default_gamma = config.train.optimizer['gamma']
         self.temp_milestones = config.train.optimizer.get('temperature_milestones', self.default_milestones)
         self.temp_gamma = config.train.optimizer.get('temperature_gamma', self.default_gamma)
         
-        # 스케줄링 단계 설정
+        # Configure scheduling phases
         self.freeze_epochs = self.temp_config['freeze_epochs']
         self.warmup_epochs = int(self.total_epochs * self.temp_config['warmup_ratio'])
         self.main_start_epoch = self.freeze_epochs + self.warmup_epochs
         
-        # Temperature parameter group 찾기
+        # Find temperature parameter group
         self.temp_lr = config.train.optimizer.get('temperature_lr', config.train.optimizer['lr'])
         self.is_temp_group = []
         for group in optimizer.param_groups:
             is_temp = abs(group['lr'] - self.temp_lr) < 1e-10
             self.is_temp_group.append(is_temp)
         
-        # Cosine 설정 (final_scheduler가 'cosine'인 경우)
+        # Cosine configuration (when final_scheduler is 'cosine')
         if self.temp_config['final_scheduler'] == 'cosine':
             self.cosine_eta_min = self.temp_lr * self.temp_config['cosine_eta_min_ratio']
             self.cosine_epochs = self.total_epochs - self.main_start_epoch
@@ -51,7 +51,7 @@ class AdvancedTemperatureScheduler(_LRScheduler):
         super().__init__(optimizer, last_epoch, verbose)
     
     def get_lr(self):
-        """PyTorch LRScheduler API 구현"""
+        """PyTorch LRScheduler API implementation"""
         if not self._get_lr_called_within_step:
             import warnings
             warnings.warn("To get the last learning rate computed by the scheduler, "
@@ -60,7 +60,7 @@ class AdvancedTemperatureScheduler(_LRScheduler):
         lrs = []
         for i, (base_lr, is_temp) in enumerate(zip(self.base_lrs, self.is_temp_group)):
             if is_temp:
-                # Temperature parameter group에 고급 스케줄링 적용
+                # Apply advanced scheduling to temperature parameter group
                 if self.last_epoch < self.freeze_epochs:
                     # Phase 1: Freeze
                     lr = 0.0
@@ -76,13 +76,13 @@ class AdvancedTemperatureScheduler(_LRScheduler):
                         lr = self.cosine_eta_min + (base_lr - self.cosine_eta_min) * \
                              (1 + math.cos(math.pi * main_epoch / self.cosine_epochs)) / 2
                     else:
-                        # MultiStep (저장된 설정 사용)
-                        # main_start_epoch 기준으로 milestone 조정
+                        # MultiStep (using saved settings)
+                        # Adjust milestone based on main_start_epoch
                         adjusted_milestones = [m - self.main_start_epoch for m in self.temp_milestones if m >= self.main_start_epoch]
                         decay_count = sum(1 for m in adjusted_milestones if m <= main_epoch)
                         lr = base_lr * (self.temp_gamma ** decay_count)
             else:
-                # 일반 parameter group (기존 MultiStepLR)
+                # Regular parameter group (existing MultiStepLR)
                 decay_count = sum(1 for m in self.default_milestones if m <= self.last_epoch)
                 lr = base_lr * (self.default_gamma ** decay_count)
             
@@ -91,16 +91,16 @@ class AdvancedTemperatureScheduler(_LRScheduler):
         return lrs
 
 class CustomScheduler(_LRScheduler):
-    """Parameter group별로 다른 scheduler를 지원하는 Custom scheduler"""
+    """Custom scheduler supporting different schedulers per parameter group"""
     def __init__(self, optimizer, config, last_epoch=-1, verbose=False):
-        # Config에서 필요한 값들만 추출하여 저장 (pickle 문제 방지)
+        # Extract and save only necessary values from config (prevent pickle issues)
         
-        # 기본 설정 (MultiStepLR)
+        # Basic configuration (MultiStepLR)
         self.default_scheduler = config.train.optimizer['scheduler']
         self.default_milestones = set(config.train.optimizer.get('milestones', []))
         self.default_gamma = config.train.optimizer.get('gamma', 0.5)
         
-        # Temperature parameter용 설정
+        # Temperature parameter configuration
         self.temp_scheduler = config.train.optimizer.get('temperature_scheduler', self.default_scheduler)
         
         if self.temp_scheduler == 'MultiStepLR':
@@ -110,14 +110,14 @@ class CustomScheduler(_LRScheduler):
             self.temp_T_max = config.train.optimizer.get('temperature_T_max', 1000)
             self.temp_eta_min = config.train.optimizer.get('temperature_eta_min', 0)
         
-        # Temperature LR 값 추출
+        # Extract temperature LR value
         self.temperature_lr = config.train.optimizer.get('temperature_lr', config.train.optimizer['lr'])
         
-        # 각 parameter group이 temperature group인지 확인
+        # Check if each parameter group is a temperature group
         self.is_temp_group = []
         for group in optimizer.param_groups:
-            # temperature parameter는 lr이 temperature_lr과 같은 그룹
-            is_temp = abs(group['lr'] - self.temperature_lr) < 1e-10  # floating point 비교
+            # temperature parameter is a group with lr matching temperature_lr
+            is_temp = abs(group['lr'] - self.temperature_lr) < 1e-10  # floating point comparison
             self.is_temp_group.append(is_temp)
         
         print(f"[SCHEDULER] Groups: {len(self.is_temp_group)}, Temperature groups: {sum(self.is_temp_group)}")

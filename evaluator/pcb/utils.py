@@ -5,15 +5,15 @@ import cv2
 def coco_poly_to_rle(poly, h, w):
     rle_ = []
     for i in range(len(poly)):
-        # ✅ tensor/numpy 변환 및 형식 정규화
+        # Convert tensor/numpy and normalize format
         try:
-            # 1. torch tensor인 경우 numpy로 변환
+            # 1. Convert torch tensor to numpy
             if hasattr(poly[i], 'detach'):  # torch.Tensor
                 poly_np = poly[i].detach().cpu().numpy()
             else:
                 poly_np = np.asarray(poly[i])
             
-            # 2. 차원 정리 (3D -> 2D)
+            # 2. Clean up dimensions (3D -> 2D)
             while poly_np.ndim > 2:
                 if poly_np.shape[0] == 1:
                     poly_np = poly_np[0]
@@ -23,21 +23,21 @@ def coco_poly_to_rle(poly, h, w):
                 else:
                     poly_np = poly_np[0]
             
-            # 3. 최종 검증 및 flatten
+            # 3. Final validation and flatten
             if poly_np.ndim == 2 and poly_np.shape[1] == 2:
-                coords = poly_np.reshape(-1).astype(np.float64)  # pycocotools 호환
+                coords = poly_np.reshape(-1).astype(np.float64)  # pycocotools compatible
             elif poly_np.ndim == 1:
                 coords = poly_np.astype(np.float64)
             else:
                 print(f"[WARN] Invalid polygon shape: {poly_np.shape}, skipping")
                 continue
             
-            # 4. 최소 요구사항 확인 (6개 좌표 = 3개 점)
+            # 4. Check minimum requirement (6 coords = 3 points)
             if len(coords) < 6:
                 print(f"[WARN/evaluator] Polygon has less than 3 points ({len(coords)//2}), skipping")
                 continue
             
-            # 5. pycocotools 호출
+            # 5. Call pycocotools
             rles = mask_utils.frPyObjects([coords.tolist()], h, w)
             rle = mask_utils.merge(rles)
             rle['counts'] = rle['counts'].decode('utf-8')

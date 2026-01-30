@@ -26,38 +26,38 @@ def make_trainer(network, cfg, network_t=None):
 
 def apply_stage(cfg, net, net_wrapper):
     """
-    Stage별 학습/로스 세팅.
-    - net_wrapper: NetworkWrapper 인스턴스(로스 weight_dict 갖고 있음)
+    Stage-specific training/loss configuration.
+    - net_wrapper: NetworkWrapper instance (contains loss weight_dict)
     """
     stage = int(cfg.train.stage)
 
     if stage == 1:
-        # 1) 파라미터: 픽셀 헤드만 학습 (+ 옵션에 따라 ct_hm, wh head도 함께)
+        # 1) Parameters: train only pixel head (+ optionally ct_hm, wh head depending on options)
         enable_pixel_head_only(net, cfg)
 
-        # 2) evolve 루프 끄기(속도↑)
+        # 2) Turn off evolve loop (speed up)
         cfg.model.evolve_iters = 0
 
-        # 3) refine 등 무거운 경로 끄고 싶다면(선택)
+        # 3) Turn off heavy paths like refine if desired (optional)
         if hasattr(cfg.model, 'use_refine_pixel'):
             cfg.model.use_refine_pixel = False
 
-        # 4) loss weight: pixel만 남기고 0으로 (+ ct_hm, wh head 학습 시 관련 loss도 유지)
-        stage1_w = dict(net_wrapper.weight_dict)  # 복사
+        # 4) loss weight: set all to 0 except pixel (+ keep related loss when training ct_hm, wh head)
+        stage1_w = dict(net_wrapper.weight_dict)  # copy
         train_ct_hm = getattr(cfg.train, 'stage1_train_ct_hm', False)
         train_wh = getattr(cfg.train, 'stage1_train_wh', False)
         
         for k in stage1_w.keys():
             stage1_w[k] = 0.0
-        # pixel 계열만 유지 (multi-scale이면 'pixel_0','pixel_1' 등도 처리)
+        # Keep only pixel-related losses (handle 'pixel_0','pixel_1' etc. if multi-scale)
         for k in list(net_wrapper.weight_dict.keys()):
             if k.startswith('pixel'):
                 stage1_w[k] = net_wrapper.weight_dict[k] if isinstance(net_wrapper.weight_dict[k], (int,float)) else 1.0
-            # ct_hm head 학습 시 box_ct loss도 유지
+            # Keep box_ct loss when training ct_hm head
             elif train_ct_hm and k == 'box_ct':
                 stage1_w[k] = net_wrapper.weight_dict[k] if isinstance(net_wrapper.weight_dict[k], (int,float)) else 1.0
                 print(f"[STAGE 1] CT_HM training enabled - keeping box_ct loss: {stage1_w[k]}")
-            # wh head 학습 시 init loss도 유지 (wh head는 init polygon 생성에 사용)
+            # Keep init loss when training wh head (wh head is used for init polygon generation)
             elif train_wh and k == 'init':
                 # config에서 0으로 설정되어 있어도 Stage 1에서 wh head 학습 시 활성화
                 original_weight = net_wrapper.weight_dict[k]

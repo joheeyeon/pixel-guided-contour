@@ -26,7 +26,7 @@ DICT_dla_module = {'base': 'base', 'dlaup': 'dla_up', 'idaup': 'ida_up'}
 
 def get_safe_num_groups(num_channels, max_groups=32):
     """
-    num_channels을 나눌 수 있는 가장 큰 num_groups을 찾아 반환
+    Find and return the largest num_groups that can divide num_channels
     """
     for g in reversed(range(1, max_groups + 1)):
         if num_channels % g == 0:
@@ -61,13 +61,13 @@ class CCPnet(nn.Module):
         self.pixel_concat_with_activation = getattr(cfg.model, 'pixel_concat_with_activation', False)
 
         if self.use_pixel_on_init:
-            # use_pixel_on_init=True: DLASeg는 pixel head만 포함
+            # use_pixel_on_init=True: DLASeg includes only pixel head
             heads_dla = {'pixel': heads['pixel']}
         else:
-            # 기존 방식: 모든 head 포함
+            # Existing approach: include all heads
             heads_dla = heads
 
-        # DLA backbone 생성
+        # Create DLA backbone
         self.dla = DLASeg('dla{}'.format(num_layers), heads_dla,
                           pretrained=True,
                           down_ratio=down_ratio,
@@ -82,35 +82,35 @@ class CCPnet(nn.Module):
                           head_conv_config=getattr(cfg.model, 'head_conv_config', None),
                           concat_multi_layers=getattr(cfg.model, 'concat_multi_layers', None))
         
-        # use_pixel_on_init가 True일 때 ct_hm, wh head를 별도로 생성
+        # Create separate ct_hm and wh heads when use_pixel_on_init is True
         if self.use_pixel_on_init:
             c_in = self.dla.base.channels[self.dla.first_level]
             if self.cfg.model.concat_upper_layer is not None:
                 c_in += getattr(self.dla, DICT_dla_module[self.cfg.model.concat_upper_layer.split('_')[0]]).channels[
                     int(self.cfg.model.concat_upper_layer.split('_')[-1])]
-            # 새로운 concat_multi_layers 채널 수 추가
+            # Add channel count for concat_multi_layers
             if getattr(self.cfg.model, 'concat_multi_layers', None) is not None:
                 for layer_name in self.cfg.model.concat_multi_layers:
                     _name, _idx = layer_name.split('_')[0], int(layer_name.split('_')[-1])
                     c_in += getattr(self.dla, DICT_dla_module[_name]).channels[_idx]
             
-            # pixel map과 concat될 feature 채널
+            # Feature channels to be concatenated with pixel map
             c_in_with_pixel = c_in + heads['pixel']
             
-            # ct_hm, wh head를 위한 별도 레이어 (pixel과 concat 후 사용)
+            # Separate layers for ct_hm and wh heads (used after pixel concatenation)
             self.init_heads = nn.ModuleDict()
             for head_name in ['ct_hm', 'wh']:
                 classes = heads[head_name]
                 fc = self._build_head_conv(c_in_with_pixel, classes, head_conv, head_name)
                 self.init_heads[head_name] = fc
 
-        # Decoder와 Evolution에 전달되는 feature는 실제로는 원본 backbone feature
-        # 따라서 pixel concat은 Evolution 모듈 내부에서만 고려되어야 함
+        # Features passed to Decoder and Evolution are actually original backbone features
+        # Therefore, pixel concatenation should only be considered inside the Evolution module
         c_in_base = self.dla.base.channels[self.dla.first_level]
         if self.cfg.model.concat_upper_layer is not None:
             c_in_base += getattr(self.dla, DICT_dla_module[self.cfg.model.concat_upper_layer.split('_')[0]]).channels[
                 int(self.cfg.model.concat_upper_layer.split('_')[-1])]
-        # 새로운 concat_multi_layers 채널 수 추가
+        # Add channel count for concat_multi_layers
         if getattr(self.cfg.model, 'concat_multi_layers', None) is not None:
             for layer_name in self.cfg.model.concat_multi_layers:
                 _name, _idx = layer_name.split('_')[0], int(layer_name.split('_')[-1])
@@ -118,13 +118,13 @@ class CCPnet(nn.Module):
         if cfg.model.add_grad_feature:
             c_in_base += 1
 
-        # Decoder: 원본 feature 사용
+        # Decoder: use original features
         c_in_decoder = c_in_base
         if self.cfg.model.cat_feature_with_pixelmap and self.cfg.model.cat_include_coarse:
             c_in_decoder += cfg.model.heads['pixel']
 
-        # Evolution: 내부에서 pixel concat이 수행되므로 base 채널만 전달
-        # (Evolution 모듈 내부에서 channel_pixel을 더해 c_out_proj 계산)
+        # Evolution: pass only base channels since pixel concatenation is performed internally
+        # (c_out_proj is calculated by adding channel_pixel inside the Evolution module)
         c_in_evolution = c_in_base
 
         self.train_decoder = Decode(num_point=cfg.commen.points_per_poly, init_stride=cfg.model.init_stride,
@@ -167,17 +167,17 @@ class CCPnet(nn.Module):
         self.net_preprocess()
 
     def _build_head_conv(self, c_in, classes, head_conv, head_name):
-        """head_conv 구조를 설정 가능하게 빌드"""
-        # head_conv_config에서 설정 가져오기
+        """Build configurable head_conv structure"""
+        # Get settings from head_conv_config
         conv_config = getattr(self.cfg.model, 'head_conv_config', {})
         
-        # 기본값 설정
+        # Set default values
         kernel_sizes = conv_config.get('kernel_sizes', [3, 1])
         channels = conv_config.get('channels', None)
         use_relu = conv_config.get('use_relu', [True])
         padding_mode = conv_config.get('padding', 'auto')
         
-        # head별 개별 설정 지원
+        # Support per-head individual settings
         if isinstance(conv_config, dict) and head_name in conv_config:
             head_specific = conv_config[head_name]
             kernel_sizes = head_specific.get('kernel_sizes', kernel_sizes)
@@ -185,36 +185,36 @@ class CCPnet(nn.Module):
             use_relu = head_specific.get('use_relu', use_relu)
             padding_mode = head_specific.get('padding', padding_mode)
         
-        # channels 설정: None이면 기본값 [head_conv, classes] 사용
+        # Configure channels: if None, use default value [head_conv, classes]
         if channels is None:
             if head_conv > 0:
                 channels = [head_conv, classes]
             else:
                 channels = [classes]
         else:
-            channels = channels + [classes]  # 마지막에 classes 추가
+            channels = channels + [classes]  # Add classes at the end
         
-        # use_relu 리스트 길이 조정 (마지막 layer는 항상 ReLU 없음)
+        # Adjust use_relu list length (last layer never has ReLU)
         if len(use_relu) < len(kernel_sizes) - 1:
             use_relu = use_relu + [True] * (len(kernel_sizes) - 1 - len(use_relu))
         
-        # 레이어 구성
+        # Layer configuration
         if head_conv > 0 or len(kernel_sizes) > 1:
             layers = []
             c_current = c_in
             
             for i, (kernel_size, c_out) in enumerate(zip(kernel_sizes, channels)):
-                # padding 계산
+                # Calculate padding
                 if padding_mode == 'auto':
                     padding = (kernel_size - 1) // 2
                 else:
                     padding = padding_mode
                 
-                # Conv2d 추가
+                # Add Conv2d
                 layers.append(nn.Conv2d(c_current, c_out, kernel_size=kernel_size, 
                                        stride=1, padding=padding, bias=True))
                 
-                # ReLU 추가 (마지막 layer 제외)
+                # Add ReLU (except last layer)
                 if i < len(channels) - 1 and i < len(use_relu) and use_relu[i]:
                     layers.append(nn.ReLU(inplace=True))
                 
@@ -222,13 +222,13 @@ class CCPnet(nn.Module):
             
             fc = nn.Sequential(*layers)
         else:
-            # head_conv == 0인 경우: 단일 1x1 conv
+            # head_conv == 0: single 1x1 conv
             kernel_size = kernel_sizes[-1] if kernel_sizes else 1
             padding = (kernel_size - 1) // 2 if padding_mode == 'auto' else padding_mode
             fc = nn.Conv2d(c_in, classes, kernel_size=kernel_size, 
                           stride=1, padding=padding, bias=True)
         
-        # hm head의 경우 bias 초기화
+        # Initialize bias for hm head
         if 'hm' in head_name:
             if isinstance(fc, nn.Sequential):
                 fc[-1].bias.data.fill_(-2.19)
@@ -245,11 +245,11 @@ class CCPnet(nn.Module):
             input = x
         
         if self.use_pixel_on_init:
-            # Step 1: backbone feature 추출 및 pixel head 실행
+            # Step 1: Extract backbone features and run pixel head
             output, cnn_feature, feature_banks = self.dla(input, save_banks=False)
-            # output에는 pixel만 있음
+            # output contains only pixel
             
-            # Step 2: pixel head output을 backbone feature와 concat
+            # Step 2: Concatenate pixel head output with backbone feature
             pixel_map = output['pixel']
             if pixel_map.shape[2:] != cnn_feature.shape[2:]:
                 pixel_map = torch.nn.functional.interpolate(
@@ -258,20 +258,20 @@ class CCPnet(nn.Module):
                     mode='nearest'
                 )
             
-            # 옵션에 따라 pixel map에 activation 적용
+            # Apply activation to pixel map based on option
             if self.pixel_concat_with_activation:
                 pixel_map = torch.nn.functional.softmax(pixel_map, dim=1)
             
-            # backbone feature와 pixel map concat
+            # Concatenate backbone feature with pixel map
             feature_with_pixel = torch.cat([cnn_feature, pixel_map], dim=1)
             
-            # Step 3: concat된 feature로 ct_hm, wh head 계산
+            # Step 3: Calculate ct_hm, wh head with concatenated features
             for head_name in ['ct_hm', 'wh']:
                 output[head_name] = self.init_heads[head_name](feature_with_pixel)
             
-            # cnn_feature는 원본 backbone feature 유지 (gcn 등에서 사용)
+            # Keep cnn_feature as original backbone feature (used by gcn etc.)
         else:
-            # 기존 방식: 모든 head 동시 처리
+            # Existing approach: process all heads simultaneously
             output, cnn_feature, feature_banks = self.dla(input, save_banks=False)
 
         #not used recently
@@ -298,11 +298,11 @@ class CCPnet(nn.Module):
             if self.cfg.model.ccp_deform_pixel_norm == 'softmax':
                 pixel_map = F.softmax(output['pixel'], dim=1)
             elif self.cfg.model.ccp_deform_pixel_norm == 'trainable_softmax':
-                # trainable_softmax의 경우 Evolution 모듈의 temperature 사용
+                # For trainable_softmax, use temperature from Evolution module
                 temperature = getattr(self.gcn, 'temperature', torch.ones(1, device=output['pixel'].device))
                 pixel_map = F.softmax(output['pixel'] / temperature, dim=1)
             elif self.cfg.model.ccp_deform_pixel_norm == 'sep_trainable_sigmoid':
-                # sep_trainable_sigmoid의 경우 Evolution 모듈의 sep_sigmoid 사용
+                # For sep_trainable_sigmoid, use sep_sigmoid from Evolution module
                 sep_sigmoid = getattr(self.gcn, 'sep_sigmoid', None)
                 if sep_sigmoid is not None:
                     pixel_map = sep_sigmoid(output['pixel'])
@@ -355,17 +355,17 @@ class CCPnet(nn.Module):
             else:
                 contour_pre = output['py'][-1]
             if self.refine_pixel is not None:
-                # ✅ .clone()을 사용하여 연산 그래프를 분기합니다.
-                # 이렇게 하면 pix_loss의 그래디언트가 py_pred로 안전하게 역전파되면서도,
-                # 기존 py_loss의 그래디언트 경로와 충돌하지 않아 RuntimeError를 방지합니다.
-                # 이로써 no_grad() 없이도 학습이 가능해져 성능 향상을 기대할 수 있습니다.
-                # error 다른 부분으로 해결 - clon() 없애고 돌려서 성능 비교
+                # ✅ Use .clone() to branch the computation graph
+                # This allows the gradient of pix_loss to backpropagate safely to py_pred
+                # while avoiding conflicts with the existing py_loss gradient path, preventing RuntimeError
+                # This enables training without no_grad() and improves performance
+                # Alternative: disable clone() and compare performance
                 refined_pixelmap, contour_map = self.refine_pixel(contour_pre, feature_deform, batch_ind=output['batch_ind'],
                                                                   pre_pixel_map=output['pixel'][-1] if self.cfg.model.ccp_refine_with_pre_pixel else None)
                 output['pixel'].append(refined_pixelmap)
                 output['contour_map'].append(contour_map)
 
-        # Stage 1에서 stage1_train_wh=True일 때만 GT polygon 추가 (학습 시에만)
+        # Add GT polygons only in Stage 1 when stage1_train_wh=True (training only)
         if (self.training and 'test' not in batch['meta'] and 
             hasattr(self.cfg.train, 'stage') and self.cfg.train.stage == 1 and
             hasattr(self.cfg.train, 'stage1_train_wh') and self.cfg.train.stage1_train_wh):
@@ -373,8 +373,8 @@ class CCPnet(nn.Module):
             from .evolve.utils import collect_training
             ct_01 = output.get('ct_01', batch.get('ct_01', torch.zeros(1, 0, dtype=torch.bool)))
             
-            if ct_01.any() and 'img_gt_init_polys' in batch:  # ct_01에 True가 있고 batch에 GT가 있을 때만 처리
-                # GT polygons을 batch에서 가져와서 output에 추가 (train_decoder와 gcn 모듈 로직 가져옴)
+            if ct_01.any() and 'img_gt_init_polys' in batch:  # Only process if ct_01 has True and batch has GT
+                # Get GT polygons from batch and add to output (following train_decoder and gcn module logic)
                 output.update({
                     'img_gt_init_polys': collect_training(batch['img_gt_init_polys'], ct_01) * self.cfg.commen.down_ratio,
                     'img_gt_coarse_polys': collect_training(batch['img_gt_coarse_polys'], ct_01) * self.cfg.commen.down_ratio,
@@ -416,13 +416,13 @@ class CCPnet(nn.Module):
             return []
 
     #====== edit:feat:self-intersection-count:25-08-10 =====
-    # CCPnet 클래스 내부에 추가
+    # Add inside CCPnet class
     def _fast_simple_mask_fixedV(self, polys_3d, eps=1e-9, max_bytes_mb=256):
         """
-        배치의 모든 폴리곤이 동일한 정점 수 V를 가질 때,
-        GPU 벡터화로 '자기교차 없음(simple)' 여부를 빠르게 판정.
-        polys_3d: (B, V, 2) float tensor  (cuda 권장)
-        반환: (B,) bool tensor  (True=simple, False=자기교차)
+        When all polygons in batch have the same number of vertices V,
+        fast determination of 'no self-intersection (simple)' using GPU vectorization.
+        polys_3d: (B, V, 2) float tensor  (GPU recommended)
+        return: (B,) bool tensor  (True=simple, False=self-intersects)
         - 인접/연속 간선 교차는 제외
         - 완전 공선(overlap)은 '교차'로 보지 않음(정밀 판정 원하면 fallback에서 처리)
         - 메모리 안전을 위해 B 축을 자동 분할(chunking) 수행
@@ -433,16 +433,16 @@ class CCPnet(nn.Module):
         device = polys_3d.device
         B, V, _ = polys_3d.shape
 
-        # (V,V) 인접 간선 마스크는 B와 무관하므로 한 번만 생성
+        # (V,V) adjacency edge mask is independent of B, so create once
         idx = torch.arange(V, device=device)
         ii = idx.view(V, 1).expand(V, V)
         jj = idx.view(1, V).expand(V, V)
         adj_2d = (torch.abs(ii - jj) <= 1) | ((ii == 0) & (jj == V - 1)) | ((jj == 0) & (ii == V - 1))
-        # adj_2d: (V,V) → chunk에서 (Bc,V,V)로 broadcast
+        # adj_2d: (V,V) → broadcast to (Bc,V,V) in chunks
 
-        # 메모리 추정으로 B-chunk 크기 결정
-        # 브로드캐스팅 시 (o1,o2,o3,o4): float32 4개 × (Bc*V*V) ≈ 16 bytes/elem
-        # inter(bool): (Bc*V*V) ≈ 1 byte/elem  → 대략 17 bytes/elem로 잡고 여유분 반영
+        # Determine B-chunk size based on memory estimation
+        # During broadcasting (o1,o2,o3,o4): 4 float32 × (Bc*V*V) ≈ 16 bytes/elem
+        # inter(bool): (Bc*V*V) ≈ 1 byte/elem → roughly 17 bytes/elem with margin
         bytes_per_elem = 18.0
         max_bytes = max_bytes_mb * 1024.0 * 1024.0
         denom = max(1.0, bytes_per_elem * V * V)
@@ -471,10 +471,10 @@ class CCPnet(nn.Module):
             o4 = orient(b1, b2, a2)
 
             inter = (o1 * o2 < -eps) & (o3 * o4 < -eps)  # (Bc,V,V)
-            inter = inter & (~adj_2d)  # 인접/같은 간선 제외 (broadcast)
+            inter = inter & (~adj_2d)  # Exclude adjacent/same edges (broadcast)
 
             #out_simple[s:e] = ~inter.any(dim=(1, 2))  # (Bc,)
-            has_inter = inter.any(dim=2).any(dim=1)  # (Bc,)  ← tuple dim 대신 연속 any
+            has_inter = inter.any(dim=2).any(dim=1)  # (Bc,) ← sequential any instead of tuple dim
             out_simple[s:e] = ~has_inter
 
         return out_simple
@@ -484,14 +484,14 @@ class CCPnet(nn.Module):
         use_fast = bool(getattr(self.cfg.test, 'si_fast_gpu', True))
         vtx_stride = int(getattr(self.cfg.test, 'si_vertex_stride', 0))  # 0이면 off
 
-        # 1) 딱 세 단계만 검사: init, coarse, py_last
+        # 1) Check exactly three stages: init, coarse, py_last
         stages = []
         if 'poly_init' in output:   stages.append(('init', output['poly_init']))
         if 'poly_coarse' in output: stages.append(('coarse', output['poly_coarse']))
         pys = output.get('py', [])
         if len(pys) > 0:            stages.append(('py_last', pys[-1]))
 
-        # 리스트로 정규화
+        # Normalize to list
         def to_list(polys):
             if polys is None: return []
             if torch.is_tensor(polys):
@@ -504,7 +504,7 @@ class CCPnet(nn.Module):
 
         stages = [(n, to_list(t)) for n, t in stages]
 
-        # 배치 크기 B
+        # Batch size B
         B = None
         for _, lst in stages:
             if len(lst) > 0:
@@ -515,7 +515,7 @@ class CCPnet(nn.Module):
                     'count_new_intersections': {n: 0 for n, _ in stages},
                     'idx_new_intersections': {n: [] for n, _ in stages}}
 
-        # 디바이스
+        # Device
         dev = None
         for _, lst in stages:
             if len(lst) and torch.is_tensor(lst[0]):
@@ -531,7 +531,7 @@ class CCPnet(nn.Module):
         counts, indices = {}, {}
         first = True
 
-        # (선택) coarse pre-pass 래퍼
+        # (Optional) coarse pre-pass wrapper
         def _coarse_or_fast(polys_3d):
             if vtx_stride and polys_3d.shape[1] >= 3:
                 coarse = polys_3d[:, ::vtx_stride, :]

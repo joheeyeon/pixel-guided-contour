@@ -118,7 +118,7 @@ def clip_to_image(poly, h, w):
 #     Args:
 #         cnn_feature: [B, C, H, W]
 #         img_poly: [N_poly, N_vert, 2] in pixel coords
-#         ind: [N_poly] — 이미지 인덱스 (0 ~ B-1)
+#         ind: [N_poly] — image indices (0 ~ B-1)
 #         h, w: height and width of feature map
 #
 #     Returns:
@@ -193,16 +193,16 @@ def uniform_upsample(poly, p_num):
 
 def global_to_local_ct_img_idx(global_idx, device_id, world_size, total_batch_size):
     """
-    DataParallel 환경에서 global index를 local index로 변환하는 함수.
+    Convert global index to local index in DataParallel environment.
 
-    예:
-        전체 batch_size가 32이고, 4개의 GPU를 사용할 경우,
-        각 GPU는 8개의 샘플을 처리하고
-        global index 9는 device 1의 local index 1이 됨.
+    Example:
+        When total batch_size is 32 and 4 GPUs are used,
+        each GPU processes 8 samples and
+        global index 9 becomes local index 1 on device 1.
 
     Args:
-        global_idx (Tensor): [N] 형태의 global index (예: ct_img_idx)
-        device_id (int): 현재 디바이스 ID (예: 0, 1, 2...)
+        global_idx (Tensor): global index of shape [N] (e.g., ct_img_idx)
+        device_id (int): current device ID (e.g., 0, 1, 2...)
         world_size (int): 총 디바이스 수
         total_batch_size (int): 전체 배치 크기 (예: 32, 64 등)
 

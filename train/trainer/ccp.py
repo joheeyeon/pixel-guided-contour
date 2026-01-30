@@ -2,20 +2,20 @@
 Snake Energy Loss Terms in CCP Framework:
 
 1. Elastic Term (Continuity): TVLoss
-   - TV (Total Variation) loss: 연속성을 강제하여 contour가 부드럽게 연결되도록
-   - Snake energy의 α * |ds/dx|² term에 대응
+   - TV (Total Variation) loss: enforces continuity to keep contour smoothly connected
+   - Corresponds to snake energy α * |ds/dx|² term
    - weight key: 'tv', 'tv_init', 'tv_coarse', 'tv_evolve', 'tv_evolve_{i}'
 
 2. Bending Term (Curvature): CurvLoss
-   - Snake energy의 β * |d²s/dx²|² term에 대응
+   - Corresponds to snake energy β * |d²s/dx²|² term
    - weight key: 'cv', 'cv_init', 'cv_coarse', 'cv_evolve', 'cv_evolve_{i}'
-   - loss_type 'l2' 설정시 정확한 snake energy와 일치
+   - when 'l2' is used, matches exact snake energy
 
-3. External Energy: pixel loss, ct loss 등
-   - 이미지 feature에 기반한 external force
-   - Snake energy의 external energy term에 대응
+3. External Energy: pixel loss, ct loss, etc.
+   - Based on image features as external force
+   - Corresponds to external energy term in snake energy
 
-Configuration 예시:
+Configuration example:
 weight_dict = {
     'tv': 1.0,      # elastic term weight
     'cv': 0.1,      # bending term weight  
@@ -23,7 +23,7 @@ weight_dict = {
 
 loss_type = {
     'tv': 'l2',     # elastic loss type
-    'cv': 'l2',     # bending loss type (정확한 snake energy)
+    'cv': 'l2',     # bending loss type (exact snake energy)
 }
 """
 
@@ -42,10 +42,10 @@ def check_nan(name, tensor):
 
 def safe_empty_tensor(tensor):
     if tensor.numel() == 0:
-        # tensor shape 예: (0, 64, 2) => (1, 64, 2) 이렇게 수정
+        # tensor shape example: (0, 64, 2) => (1, 64, 2) like this
         shape = list(tensor.shape)
         if shape[0] == 0:
-            shape[0] = 1  # batch dim만 1로 변경
+            shape[0] = 1  # change batch dim to 1
         empty_tensor = torch.zeros(
             shape,
             dtype=tensor.dtype,
@@ -101,7 +101,7 @@ class NetworkWrapper(nn.Module):
                     reduction = "mean" if self.cfg.train.loss_params['pixel'].get('reduce', True) else "none"
                     self.pix_crit = FocalBCELoss(gamma=gamma, alpha_fg=alpha_fg, alpha_bg=alpha_bg, reduction=reduction)
                 elif self.pix_type == 'temperature_focal':
-                    # trainable_softmax 타입일 때 사용되는 temperature focal CE loss
+                    # Temperature focal CE loss used for trainable_softmax type
                     self.pix_crit = TemperatureFocalCELoss(gamma=self.cfg.train.loss_params['pixel']['gamma'] if 'gamma' in self.cfg.train.loss_params['pixel'] else 2,
                                                           reduce=self.cfg.train.loss_params['pixel']['reduce'] if 'reduce' in self.cfg.train.loss_params['pixel'] else True)
                 else:
@@ -162,7 +162,7 @@ class NetworkWrapper(nn.Module):
                 self.kd_inter_crit = CosineSimLoss(apply_type=self.cfg.train.kd_param[
                     'feature_apply_type'] if 'feature_apply_type' in self.cfg.train.kd_param else 'channel')
 
-        # DDP-safe anchor param (가벼움; 모든 step에서 그래프 연결 보장), edit:debug:ddp-stop:25-08-09
+        # DDP-safe anchor param (lightweight; ensures graph connection at every step), edit:debug:ddp-stop:25-08-09
         self.register_buffer("_ddp_anchor", torch.zeros((), dtype=torch.float32), persistent=False)
 
     def forward(self, batch, mode='default', output_t=None):
@@ -178,14 +178,14 @@ class NetworkWrapper(nn.Module):
         out_ontraining = {}
         epoch = batch['epoch']
         scalar_stats = {}
-        # 항상 텐서+그래프로 시작 (rank/step 동일하게 존재), DDP-safe, edit:debug:ddp-stop:25-08-09
+        # Always start with tensor+graph (same rank/step exists), DDP-safe, edit:debug:ddp-stop:25-08-09
         loss = self._ddp_anchor * 0.0
         dummy = self._ddp_anchor * 0.0
 
         keyPointsMask = batch['keypoints_mask'][batch['ct_01']]
         # vertex cls
         if self.cfg.train.weight_dict.get("vertex_cls", 0.) > 0:
-            # 🚨 DDP-safe check: 'py_valid_logits'가 비어있는 경우를 처리합니다.
+            # DDP-safe check: Handle case where 'py_valid_logits' is empty.
             if 'py_valid_logits' in output and len(output['py_valid_logits']) > 0:
                 vertex_cls_loss = dummy
                 for py_valid_logit in output['py_valid_logits']:
@@ -195,7 +195,7 @@ class NetworkWrapper(nn.Module):
                     vertex_gt_coord = output['img_gt_polys']
                     vertex_cls_loss += self.loss_dict["vertex_cls"](pred_vertex_logits, pred_coords, vertex_gt_coord, keyPointsMask)/len(output['py_valid_logits'])
             else:
-                # 'py_valid_logits'가 없거나 비어있으면 dummy_loss를 사용하여 연산 그래프를 유지합니다.
+                # If 'py_valid_logits' is missing or empty, use dummy_loss to maintain computation graph.
                 vertex_cls_loss = dummy
             scalar_stats.update({'vtx_cls_loss': vertex_cls_loss})
             weight_vertex_cls = self.cfg.train.weight_dict.get("vertex_cls", 0.)

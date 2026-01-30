@@ -78,7 +78,7 @@ def make_train_loader(cfg, split=None):
         pin_memory=True,
         persistent_workers = False,
         worker_init_fn=seed_worker,
-        generator=torch.Generator().manual_seed(cfg.commen.seed)  # DataLoader 전체 seed
+        generator=torch.Generator().manual_seed(cfg.commen.seed)  # DataLoader-wide seed
     )
     return data_loader
 

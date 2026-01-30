@@ -73,7 +73,7 @@ class SmoothedValue(object):
 #             try:
 #                 if isinstance(v, torch.Tensor):
 #                     self.loss_stats[k].update(v.detach().cpu())
-#                 else:  # 이미 float이면 바로 업데이트
+#                 else:  # If already float, update directly
 #                     self.loss_stats[k].update(v)
 #             except KeyError:
 #                 if isinstance(v, torch.Tensor):

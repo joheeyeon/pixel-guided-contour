@@ -37,22 +37,22 @@ def _to_uint8(img_chw):
     else:
         img = img_chw.astype(np.float32)
     img = np.transpose(img, (1, 2, 0))  # HWC
-    # 대충 0~1 또는 -2~2 같은 정규화 대응: 0~255로 스케일링
+    # Roughly handle 0~1 or -2~2 normalization: scale to 0~255
     mn, mx = float(img.min()), float(img.max())
     if mx - mn < 1e-6:
         img = np.zeros_like(img)
     else:
         img = (img - mn) / (mx - mn)
     img = (img * 255.0).clip(0, 255).astype(np.uint8)
-    # 모델 입력이 RGB일 가능성 → OpenCV는 BGR이므로 변환 없이 그려도 크게 무방
+    # Model input is likely RGB -> OpenCV uses BGR, so drawing without conversion is fine
     return img
 
 def _draw_polys(img, polys, color, thickness=2):
-    """ polys: list[Tensor/ndarray (Nv,2)] 또는 Tensor(list-like) """
+    """ polys: list[Tensor/ndarray (Nv,2)] or Tensor(list-like) """
     out = img.copy()
     if polys is None:
         return out
-    # 배치 단위일 수 있으니 i번째만 들어오도록 상단 호출부에서 주의
+    # Ensure only i-th polygon is passed from parent call
     for poly in polys:
         if poly is None:
             continue
@@ -68,42 +68,42 @@ def _draw_polys(img, polys, color, thickness=2):
 
 def visualize_gt(batch, save_dir="debug_gt"):
     """
-    왼쪽: init (batch['img_gt_polys'])
-    오른쪽: coarse (batch['img_gt_coarse_polys'])
-    파일명: batch['meta']['img_name'][i] 사용
+    Left: init (batch['img_gt_polys'])
+    Right: coarse (batch['img_gt_coarse_polys'])
+    Filename: use batch['meta']['img_name'][i]
     """
     os.makedirs(save_dir, exist_ok=True)
 
     imgs = batch['inp']                 # (B,C,H,W)
     B = imgs.shape[0]
 
-    # 이미지 이름 확보
+    # Get image names
     img_names = None
     if ('meta' in batch) and isinstance(batch['meta'], dict) and ('img_name' in batch['meta']):
         img_names = batch['meta']['img_name']
-        # img_names가 tensor가 아니라 list[str] 형태라고 가정. 아니면 변환
+        # Assume img_names is list[str] format, convert if needed
         if isinstance(img_names, torch.Tensor):
             img_names = [str(x) for x in img_names]
 
     gt_init_all = batch.get('img_gt_polys', None)
     gt_coarse_all = batch.get('img_gt_coarse_polys', None)
 
-    # 배치 구조가 리스트-오브-리스트(각 이미지별 다수 폴리곤)라고 가정
+    # Assume batch structure is list-of-lists (multiple polygons per image)
     for i in range(B):
         base = _to_uint8(imgs[i])  # H,W,C (uint8)
 
-        # 왼쪽: init (초록)
+        # Left: init (green)
         left = _draw_polys(base, None if gt_init_all is None else gt_init_all[i]*4, (0,255,0), 2)
 
-        # 오른쪽: coarse (빨강)
+        # Right: coarse (red)
         right = _draw_polys(base, None if gt_coarse_all is None else gt_coarse_all[i]*4, (0,0,255), 2)
 
-        # 가로로 붙이기 + 가운데 하얀 구분선
+        # Concatenate horizontally + white separator in the middle
         h, w, _ = left.shape
-        sep = np.full((h, 4, 3), 255, dtype=np.uint8)  # 얇은 흰색 벽
+        sep = np.full((h, 4, 3), 255, dtype=np.uint8)  # thin white wall
         vis = np.concatenate([left, sep, right], axis=1)
 
-        # 파일명 정하기
+        # Determine filename
         if img_names and i < len(img_names):
             stem = os.path.splitext(os.path.basename(img_names[i]))[0]
             save_path = os.path.join(save_dir, f"{stem}.png")
@@ -132,18 +132,18 @@ def visualize_pixel_maps(batch, output, save_dir="pixel_viz", batch_idx=0, mode=
     
     os.makedirs(save_dir, exist_ok=True)
     
-    # 이미지 가져오기
+    # Get images
     imgs = batch['inp']  # (B, C, H, W)
     B = imgs.shape[0]
     
-    # 이미지 이름 확보
+    # Get image names
     img_names = None
     if ('meta' in batch) and isinstance(batch['meta'], dict) and ('img_name' in batch['meta']):
         img_names = batch['meta']['img_name']
         if isinstance(img_names, torch.Tensor):
             img_names = [str(x) for x in img_names]
     
-    # Pixel maps 추출
+    # Extract pixel maps
     if 'pixel' not in output:
         print("[WARN] No pixel maps in output")
         return
@@ -152,21 +152,21 @@ def visualize_pixel_maps(batch, output, save_dir="pixel_viz", batch_idx=0, mode=
     if not isinstance(pixel_maps, list):
         pixel_maps = [pixel_maps]
     
-    # raw 시각화 옵션 확인
+    # Check raw visualization option
     viz_raw = (cfg is not None and getattr(cfg.test, 'viz_pixel_raw', False))
     
-    # ccp_deform_pixel_norm 확인 (기존 unnormalized 설정)
+    # Check ccp_deform_pixel_norm (existing unnormalized setting)
     is_unnormalized = (cfg is not None and 
                       hasattr(cfg.model, 'ccp_deform_pixel_norm') and 
                       cfg.model.ccp_deform_pixel_norm == 'unnormalized')
     
-    # 각 배치 이미지에 대해
+    # For each batch image
     for i in range(B):
         base_img = _to_uint8(imgs[i])  # (H, W, C)
         H, W = base_img.shape[:2]
         
         if mode == 'final':
-            # 최종 pixel map만 시각화
+            # Visualize only final pixel map
             pixel_map = pixel_maps[-1][i] if len(pixel_maps) > 0 else None
             if pixel_map is None:
                 continue
@@ -179,31 +179,31 @@ def visualize_pixel_maps(batch, output, save_dir="pixel_viz", batch_idx=0, mode=
                                                img_names, i, batch_idx, stage_name="final_raw")
                 continue
             elif is_unnormalized and pixel_map.shape[0] > 1:
-                # 기존 unnormalized 설정일 때 각 채널별로 시각화
+                # Existing unnormalized setting: visualize each channel
                 _visualize_unnormalized_channels(pixel_map, base_img, save_dir, 
                                                img_names, i, batch_idx, stage_name="final")
                 continue
             else:
-                # 기존 방식 (normalized)
+                # Existing method (normalized)
                 if pixel_map.shape[0] > 1:
                     pixel_prob = torch.softmax(pixel_map, dim=0)[1]
                 else:
                     pixel_prob = torch.sigmoid(pixel_map[0])
                 
-                # 원본 크기로 리사이즈
+                # Resize to original size
                 pixel_resized = torch.nn.functional.interpolate(
                     pixel_prob.unsqueeze(0).unsqueeze(0),
                     size=(H, W), mode='nearest'
                 ).squeeze().numpy()
                 
-                # 컬러맵 적용
+                # Apply colormap
                 pixel_colored = (pixel_resized * 255).astype(np.uint8)
                 pixel_colored = cv2.applyColorMap(pixel_colored, cv2.COLORMAP_JET)
                 
-                # 원본 이미지와 오버레이
+                # Overlay with original image
                 overlay = cv2.addWeighted(base_img, 0.5, pixel_colored, 0.5, 0)
                 
-                # 파일 저장
+                # Save file
                 if img_names and i < len(img_names):
                     stem = os.path.splitext(os.path.basename(img_names[i]))[0]
                     save_path = os.path.join(save_dir, f"{stem}_b{batch_idx:04d}.png")
@@ -214,7 +214,7 @@ def visualize_pixel_maps(batch, output, save_dir="pixel_viz", batch_idx=0, mode=
             
         elif mode == 'all':
             if viz_raw:
-                # --viz_pixel_raw 옵션: 모든 stage에서 unnormalized 형태로 시각화
+                # --viz_pixel_raw option: visualize all stages in unnormalized form
                 for stage_idx, pixel_map in enumerate(pixel_maps):
                     if pixel_map is None:
                         continue
@@ -225,7 +225,7 @@ def visualize_pixel_maps(batch, output, save_dir="pixel_viz", batch_idx=0, mode=
                                                        stage_name=f"stage{stage_idx}_raw")
                 continue
             elif is_unnormalized:
-                # 기존 unnormalized 설정일 때 각 stage별로 채널 분리 시각화
+                # Existing unnormalized setting: visualize each stage with separated channels
                 for stage_idx, pixel_map in enumerate(pixel_maps):
                     if pixel_map is None:
                         continue
@@ -236,7 +236,7 @@ def visualize_pixel_maps(batch, output, save_dir="pixel_viz", batch_idx=0, mode=
                                                        stage_name=f"stage{stage_idx}")
                 continue
             else:
-                # 기존 방식: 모든 단계별 pixel map을 가로로 나열
+                # Existing method: list all stage pixel maps horizontally
                 stages = []
                 
                 for stage_idx, pixel_map in enumerate(pixel_maps):
@@ -249,17 +249,17 @@ def visualize_pixel_maps(batch, output, save_dir="pixel_viz", batch_idx=0, mode=
                     else:
                         pixel_prob = torch.sigmoid(pixel_map_i[0])
                     
-                    # 원본 크기로 리사이즈
+                    # Resize to original size
                     pixel_resized = torch.nn.functional.interpolate(
                         pixel_prob.unsqueeze(0).unsqueeze(0),
                         size=(H, W), mode='nearest'
                     ).squeeze().numpy()
                     
-                    # 컬러맵 적용
+                    # Apply colormap
                     pixel_colored = (pixel_resized * 255).astype(np.uint8)
                     pixel_colored = cv2.applyColorMap(pixel_colored, cv2.COLORMAP_JET)
                     
-                    # 원본 이미지와 오버레이
+                    # Overlay with original image
                     stage_overlay = cv2.addWeighted(base_img, 0.5, pixel_colored, 0.5, 0)
                     stages.append(stage_overlay)
                 
@@ -272,7 +272,7 @@ def visualize_pixel_maps(batch, output, save_dir="pixel_viz", batch_idx=0, mode=
                 for stage_img in stages[1:]:
                     overlay = np.concatenate([overlay, sep, stage_img], axis=1)
                 
-                # 파일 저장 (all 모드)
+                # Save file (all mode)
                 if img_names and i < len(img_names):
                     stem = os.path.splitext(os.path.basename(img_names[i]))[0]
                     save_path = os.path.join(save_dir, f"{stem}_b{batch_idx:04d}.png")
@@ -284,15 +284,15 @@ def visualize_pixel_maps(batch, output, save_dir="pixel_viz", batch_idx=0, mode=
 
 def _visualize_unnormalized_channels(pixel_map, base_img, save_dir, img_names, img_idx, batch_idx, stage_name="final"):
     """
-    unnormalized pixel map의 각 채널을 분리하여 colorbar와 함께 시각화
+    Visualize each channel of unnormalized pixel map separately with colorbar
     Args:
         pixel_map: unnormalized pixel tensor (C, H_feat, W_feat)
-        base_img: 원본 이미지 (H, W, 3)
-        save_dir: 저장 디렉토리
-        img_names: 이미지 이름 리스트
-        img_idx: 배치 내 이미지 인덱스
-        batch_idx: 배치 인덱스
-        stage_name: 스테이지 이름
+        base_img: original image (H, W, 3)
+        save_dir: saving directory
+        img_names: list of image names
+        img_idx: image index in batch
+        batch_idx: batch index
+        stage_name: stage name
     """
     import matplotlib.pyplot as plt
     import numpy as np
@@ -301,7 +301,7 @@ def _visualize_unnormalized_channels(pixel_map, base_img, save_dir, img_names, i
     H, W = base_img.shape[:2]
     C = pixel_map.shape[0]
     
-    # 파일명 생성
+    # Generate filename
     if img_names and img_idx < len(img_names):
         stem = os.path.splitext(os.path.basename(img_names[img_idx]))[0]
         base_filename = f"{stem}_b{batch_idx:04d}_{stage_name}"
@@ -311,16 +311,16 @@ def _visualize_unnormalized_channels(pixel_map, base_img, save_dir, img_names, i
     # Skip individual channel visualization to save storage space
     # Only create combined visualization below
     
-    # 모든 채널을 하나의 그림에 표시 (선택적)
+    # Display all channels in one figure (optional)
     if C > 1:
         fig, axes = plt.subplots(1, C + 1, figsize=(5 * (C + 1), 5))
         
-        # 첫 번째: 원본 이미지
+        # First: original image
         axes[0].imshow(base_img)
         axes[0].set_title('Original Image')
         axes[0].axis('off')
         
-        # 나머지: 각 채널
+        # Remaining: each channel
         for c in range(C):
             channel_map = pixel_map[c]
             channel_resized = torch.nn.functional.interpolate(
@@ -346,7 +346,7 @@ def _visualize_unnormalized_channels(pixel_map, base_img, save_dir, img_names, i
 
 def visualize_stage1_pixel_results(batch, output, save_dir="stage1_viz", batch_idx=0):
     """
-    Stage 1 전용 시각화: 원본 이미지 + pixel mask + GT mask 오버레이
+    Stage 1 visualization: original image + pixel mask + GT mask overlay
     """
     if 'pixel' not in output:
         return

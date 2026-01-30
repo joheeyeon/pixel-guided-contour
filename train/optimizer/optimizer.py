@@ -13,9 +13,9 @@ def make_optimizer(net, cfg):
     lr = opt_cfg['lr']
     weight_decay = opt_cfg['weight_decay']
     
-    # temperature parameter들을 위한 별도 설정
-    temperature_lr = opt_cfg.get('temperature_lr', lr)  # default는 일반 lr과 동일
-    temperature_weight_decay = opt_cfg.get('temperature_weight_decay', weight_decay)  # default는 일반 weight_decay와 동일
+    # Separate configuration for temperature parameters
+    temperature_lr = opt_cfg.get('temperature_lr', lr)  # default same as general lr
+    temperature_weight_decay = opt_cfg.get('temperature_weight_decay', weight_decay)  # default same as general weight_decay
     
     params = []
     temperature_params = []
@@ -29,7 +29,7 @@ def make_optimizer(net, cfg):
             continue
         n_trainable += value.numel()
         
-        # temperature parameter인지 확인 (trainable_softmax에서 사용되는 temperature)
+        # Check if it's a temperature parameter (used in trainable_softmax)
         if 'temperature' in key and hasattr(cfg.model, 'ccp_deform_pixel_norm') and cfg.model.ccp_deform_pixel_norm == 'trainable_softmax':
             temperature_params.append({"params": [value], "lr": temperature_lr, "weight_decay": temperature_weight_decay})
             n_temperature += value.numel()
@@ -37,25 +37,25 @@ def make_optimizer(net, cfg):
         else:
             params.append({"params": [value], "lr": lr, "weight_decay": weight_decay})
 
-    # temperature parameter group 추가
+    # Add temperature parameter group
     if temperature_params:
         params.extend(temperature_params)
         
     if len(params) == 0:
         raise RuntimeError("No trainable parameters found. Did you call apply_stage(...) before make_optimizer()?")
 
-    # Optimizer 생성
+    # Create optimizer
     name = opt_cfg.get('name', 'adam')
     if 'adam' in name:
         optimizer = _optimizer_factory[name](params, lr, weight_decay=weight_decay)
     else:
         optimizer = _optimizer_factory[name](params, lr, momentum=0.9)
 
-    # initial_lr 설정 (scheduler를 위해 필요)
+    # Set initial_lr (required for scheduler)
     for group in optimizer.param_groups:
         group.setdefault('initial_lr', group['lr'])
 
-    # (선택) 간단 로그
+    # (Optional) Simple logging
     print(f"[OPT] stage={int(getattr(cfg.train, 'stage', 2))} lr={lr} wd={weight_decay} | "
           f"params: trainable={n_trainable:,} / total={n_total:,}")
     if n_temperature > 0:

@@ -103,8 +103,8 @@ def load_network(net, model_dir, strict=True, map_location=None, specific=None):
 
 def load_network_lightning(net, model_dir, strict=True):
     """
-    PyTorch Lightning으로 저장된 체크포인트(.ckpt)를 불러오기 위한 전용 함수.
-    'state_dict'에서 가중치를 추출하고, 'network.' 같은 접두사를 자동으로 제거합니다.
+    Function to load checkpoints saved with PyTorch Lightning.
+    Extracts weights from 'state_dict' and automatically removes prefixes like 'network.'.
     """
     if not os.path.exists(model_dir):
         print(colored(f'WARNING: Lightning checkpoint not found at {model_dir}', 'red'))
@@ -112,17 +112,17 @@ def load_network_lightning(net, model_dir, strict=True):
 
     print(f'Loading Lightning model: {model_dir}')
 
-    # 체크포인트 파일을 CPU로 먼저 불러와 안정성을 높입니다.
+    # Load checkpoint to CPU first for stability
     checkpoint = torch.load(model_dir, map_location='cpu')
 
-    # 1. 체크포인트에서 실제 가중치(state_dict)를 추출합니다.
+    # 1. Extract actual weights (state_dict) from checkpoint
     if 'state_dict' in checkpoint:
         state_dict = checkpoint['state_dict']
     else:
         print(colored("WARNING: 'state_dict' key not found. Assuming the file is a raw state_dict.", 'yellow'))
         state_dict = checkpoint
 
-    # 2. 'loss_module.net.', 'network.' 등 다양한 접두사를 제거하여 키를 정리합니다.
+    # 2. Remove various prefixes like 'loss_module.net.', 'network.' to clean up keys
     cleaned_state_dict = {}
     for k, v in state_dict.items():
         if k.startswith('loss_module.net.'):
@@ -133,23 +133,24 @@ def load_network_lightning(net, model_dir, strict=True):
             new_key = k
         cleaned_state_dict[new_key] = v
 
-    # 3. 정리된 가중치를 모델에 직접 로드합니다.
+    # 3. Load cleaned weights directly into the model
     net.load_state_dict(cleaned_state_dict, strict=strict)
 
     return checkpoint.get('epoch', 0)
 
 def load_stage1_modules_selective(net, model_path, cfg=None):
     """
-    Stage 1에서 학습된 모듈만 선택적으로 로드하는 함수.
-    전체 모델 구조가 다르더라도 Stage 1 모듈들만 비교해서 호환되는 부분만 로드합니다.
+    Function to selectively load modules trained in Stage 1.
+    Even if the entire model structure differs, this function compares only Stage 1 modules
+    and loads only the compatible parts.
     
     Args:
-        net: 현재 네트워크 (Stage 2 구조)
-        model_path: Stage 1 모델 경로
-        cfg: 설정 객체 (stage1_train_ct_hm, stage1_train_wh 확인용)
+        net: Current network (Stage 2 structure)
+        model_path: Path to Stage 1 model
+        cfg: Configuration object (for checking stage1_train_ct_hm, stage1_train_wh)
     
     Returns:
-        bool: 로드 성공 여부
+        bool: Whether loading was successful
     """
     if not os.path.exists(model_path):
         print(colored(f'WARNING: Stage 1 model not found at {model_path}', 'red'))
@@ -158,10 +159,10 @@ def load_stage1_modules_selective(net, model_path, cfg=None):
     try:
         print(f'[SELECTIVE LOAD] Loading Stage 1 modules from: {model_path}')
         
-        # 체크포인트 로드
+        # Load checkpoint
         checkpoint = torch.load(model_path, map_location='cpu')
         
-        # state_dict 추출
+        # Extract state_dict
         if 'state_dict' in checkpoint:
             stage1_state_dict = checkpoint['state_dict']
         elif 'net' in checkpoint:
@@ -169,7 +170,7 @@ def load_stage1_modules_selective(net, model_path, cfg=None):
         else:
             stage1_state_dict = checkpoint
         
-        # 접두사 정리
+        # Clean up prefixes
         cleaned_stage1_dict = {}
         for k, v in stage1_state_dict.items():
             if k.startswith('loss_module.net.'):
@@ -180,56 +181,56 @@ def load_stage1_modules_selective(net, model_path, cfg=None):
                 new_key = k
             cleaned_stage1_dict[new_key] = v
         
-        # 현재 모델의 state_dict
+        # Get state_dict of current model
         current_state_dict = net.state_dict()
         
-        # Stage 1에서 학습된 모듈들 정의
+        # Define modules trained in Stage 1
         stage1_trained_ct_hm = getattr(cfg.train, 'stage1_train_ct_hm', False) if cfg else False
         stage1_trained_wh = getattr(cfg.train, 'stage1_train_wh', False) if cfg else False
         
-        # Stage 1 모듈 패턴들
+        # Stage 1 module patterns
         stage1_module_patterns = [
-            'pixel',      # pixel head (항상 포함)
+            'pixel',      # pixel head (always included)
             'dla',        # backbone
             'backbone',   # backbone
             'base_layer', # backbone
         ]
         
-        # 옵션에 따라 추가 모듈
+        # Add additional modules based on options
         if stage1_trained_ct_hm:
             stage1_module_patterns.append('ct_hm')
         if stage1_trained_wh:
             stage1_module_patterns.append('wh')
         
-        # 선택적 로드 수행
+        # Perform selective loading
         loaded_params = 0
         total_stage1_params = 0
         skipped_params = []
         
         for param_name, param_value in cleaned_stage1_dict.items():
-            # Stage 1 모듈인지 확인
+            # Check if it's a Stage 1 module
             is_stage1_module = any(pattern in param_name.lower() for pattern in stage1_module_patterns)
             
             if is_stage1_module:
                 total_stage1_params += 1
                 
-                # 현재 모델에 해당 파라미터가 있고 크기가 일치하는지 확인
+                # Check if the parameter exists in the current model and has matching size
                 if param_name in current_state_dict:
                     if current_state_dict[param_name].shape == param_value.shape:
-                        # 로드 성공
+                        # Successfully loaded
                         current_state_dict[param_name] = param_value
                         loaded_params += 1
                         print(f"  ✅ [LOADED] {param_name} {param_value.shape}")
                     else:
-                        # 크기 불일치
+                        # Shape mismatch
                         skipped_params.append(f"{param_name} (shape mismatch: current={current_state_dict[param_name].shape}, stage1={param_value.shape})")
                         print(f"  ❌ [SKIP] {param_name} - shape mismatch: current={current_state_dict[param_name].shape}, stage1={param_value.shape}")
                 else:
-                    # 파라미터 없음
+                    # Parameter not found
                     skipped_params.append(f"{param_name} (not found in current model)")
                     print(f"  ❌ [SKIP] {param_name} - not found in current model")
         
-        # 업데이트된 state_dict 로드
+        # Load updated state_dict
         net.load_state_dict(current_state_dict, strict=True)
         
         print(f"[SELECTIVE LOAD] Summary:")
@@ -239,7 +240,7 @@ def load_stage1_modules_selective(net, model_path, cfg=None):
         
         if skipped_params:
             print(f"  Skipped parameters:")
-            for skip_info in skipped_params[:5]:  # 최대 5개만 출력
+            for skip_info in skipped_params[:5]:  # Print at most 5
                 print(f"    - {skip_info}")
             if len(skipped_params) > 5:
                 print(f"    - ... and {len(skipped_params) - 5} more")
