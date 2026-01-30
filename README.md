@@ -1,9 +1,9 @@
 # Contour-based Instance Segmentation with the Aid of Pixel-wise Classification and Topological Regularization
 
-Official implementation of the IEEE Access paper  
-**“Contour-based Instance Segmentation with the Aid of Pixel-wise Classification and Topological Regularization.”**
+Official implementation of a paper submitted to IEEE Access  
+“Contour-based Instance Segmentation with the Aid of Pixel-wise Classification and Topological Regularization.”
 
-This repository provides the source code and dataset resources used in the paper.
+This repository provides the source code and dataset resources used in the submitted manuscript.
 
 ---
 
@@ -33,33 +33,7 @@ pixel-guided-contour/
  ├─ requirements.txt
  ├─ LICENSE
  └─ README.md
-
-## Dataset
-
-This repository includes the dataset resources required to reproduce the experiments reported in the paper.
-
-### PCB Bond Finger Dataset (industrial domain)
-
-- COCO-format polygon annotations (JSON)
-- Train/validation/test splits
-- Representative sample images
-
-### WHU Building Dataset (remote sensing domain)
-
-- Train/validation/test splits
-- Representative sample images
-
-Due to confidentiality constraints, the full-resolution raw images of the PCB Bond Finger dataset are not publicly released.  
-The provided annotations, splits, and sample images are sufficient to reproduce the reported results when combined with equivalent data.
-
-Detailed dataset descriptions and formats are provided in `data/README.md`.
-
----
-
-## Annotation Format
-
-All annotations are provided in **COCO format** as JSON files.  
-Object instances are annotated using polygon segmentations following the standard COCO specification.
+```
 
 ---
 
