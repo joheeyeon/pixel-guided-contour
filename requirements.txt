@@ -1,0 +1,10 @@
+opencv-python==4.9.0.80
+wget
+imgaug
+scikit-image
+"numpy<2.0"
+tensorboardX
+termcolor
+psutil
+pycocotools
+rdp
