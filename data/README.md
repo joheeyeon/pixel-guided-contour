@@ -12,6 +12,12 @@ The experiments are conducted on two datasets from different domains: an industr
 
 The PCB Bond Finger dataset is collected from real-world industrial manufacturing lines.
 It consists of cropped PCB images containing multiple gold-plated bond fingers located along the board edges.
+The full PCB Bond Finger dataset (images and annotations) is publicly available via Google Drive:
+
+https://drive.google.com/drive/folders/1kub2J6OgIgowm8CEfyQgzCngzu3bYZKZ?usp=sharing
+
+Due to the file size limitations of GitHub, the dataset is hosted externally.
+Users should download the dataset from the link above and place it under the appropriate data directory before training or evaluation.
 
 ### Resources provided in this repository
 
