@@ -83,14 +83,10 @@ The dataset resources provided in this repository are intended for research purp
 ## Citation
 
 This work has been published in IEEE Access.
+
 If you find this work useful, please cite:
-@ARTICLE{11421939,
-  author={Jo, Heeyeon and Kim, Jeongtae},
-  journal={IEEE Access}, 
-  title={Contour-Based Instance Segmentation With the Aid of Pixel-Wise Classification and Topological Regularization}, 
-  year={2026},
-  volume={14},
-  number={},
-  pages={39657-39671},
-  keywords={Instance segmentation;Feature extraction;Head;Deformation;Iterative methods;Accuracy;Location awareness;Inspection;Stability analysis;Pipelines;Active contours;buildings;deep learning;image segmentation;instance segmentation;printed circuits;remote sensing},
-  doi={10.1109/ACCESS.2026.3670891}}
+
+Jo, Heeyeon and Kim, Jeongtae,  
+"Contour-Based Instance Segmentation With the Aid of Pixel-Wise Classification and Topological Regularization,"  
+IEEE Access, vol. 14, pp. 39657–39671, 2026.  
+https://doi.org/10.1109/ACCESS.2026.3670891
