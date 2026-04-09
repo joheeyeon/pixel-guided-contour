@@ -1,9 +1,9 @@
 # Contour-based Instance Segmentation with the Aid of Pixel-wise Classification and Topological Regularization
 
-Official implementation of a paper submitted to IEEE Access  
+Official implementation of the paper published in IEEE Access:
 “Contour-based Instance Segmentation with the Aid of Pixel-wise Classification and Topological Regularization.”
 
-This repository provides the source code and dataset resources used in the submitted manuscript.
+This repository provides the source code and dataset resources used in the published work.
 
 ---
 
@@ -82,6 +82,15 @@ The dataset resources provided in this repository are intended for research purp
 
 ## Citation
 
-This work has been submitted to IEEE Access.
-
-If you find this repository useful, please consider citing the paper after publication.
+This work has been published in IEEE Access.
+If you find this work useful, please cite:
+@ARTICLE{11421939,
+  author={Jo, Heeyeon and Kim, Jeongtae},
+  journal={IEEE Access}, 
+  title={Contour-Based Instance Segmentation With the Aid of Pixel-Wise Classification and Topological Regularization}, 
+  year={2026},
+  volume={14},
+  number={},
+  pages={39657-39671},
+  keywords={Instance segmentation;Feature extraction;Head;Deformation;Iterative methods;Accuracy;Location awareness;Inspection;Stability analysis;Pipelines;Active contours;buildings;deep learning;image segmentation;instance segmentation;printed circuits;remote sensing},
+  doi={10.1109/ACCESS.2026.3670891}}
